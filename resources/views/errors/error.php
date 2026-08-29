@@ -13,8 +13,8 @@ declare(strict_types=1);
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $escape($status) ?> · Rea CMS</title>
-    <script src="/assets/theme.js"></script>
-    <link rel="stylesheet" href="/assets/app.css">
+    <script src="/assets/theme.js?v=1"></script>
+    <link rel="stylesheet" href="/assets/app.css?v=2">
 </head>
 <body class="min-h-screen bg-surface text-primary">
     <main class="page-shell py-16">

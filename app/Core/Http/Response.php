@@ -23,6 +23,11 @@ final class Response
         return new self($body, $status, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
 
+    public static function redirect(string $location, int $status = 303): self
+    {
+        return new self('', $status, ['Location' => $location]);
+    }
+
     /**
      * @param array<string, mixed> $data
      *

@@ -28,6 +28,7 @@ final class Application
     public function handle(Request $request): Response
     {
         $requestId = ($this->requestIdFactory)();
+        $request = $request->withRequestId($requestId);
 
         try {
             $response = $this->router->dispatch($request);

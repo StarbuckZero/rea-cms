@@ -181,4 +181,40 @@
     color: var(--rea-status-success);
     padding: 1rem;
   }
+
+  .notice-danger {
+    border: 1px solid var(--rea-status-danger);
+    border-radius: 0.5rem;
+    color: var(--rea-status-danger);
+    padding: 1rem;
+  }
+
+  .auth-panel {
+    margin-inline: auto;
+    max-width: 28rem;
+  }
+
+  .panel {
+    border: 1px solid var(--rea-border-default);
+    border-radius: 0.75rem;
+    background: var(--rea-surface-raised);
+    padding: 1.5rem;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-input {
+    border: 1px solid var(--rea-border-default);
+    border-radius: 0.5rem;
+    background: var(--rea-surface-raised);
+    color: var(--rea-text-primary);
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    width: 100%;
+  }
 }

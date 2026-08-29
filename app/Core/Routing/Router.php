@@ -28,6 +28,14 @@ final class Router
         $this->add('GET', $path, $handler);
     }
 
+    /**
+     * @param callable(Request, array<string, string>): Response $handler
+     */
+    public function post(string $path, callable $handler): void
+    {
+        $this->add('POST', $path, $handler);
+    }
+
     public function dispatch(Request $request): Response
     {
         $allowedMethods = [];

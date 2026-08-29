@@ -16,6 +16,8 @@ final class Request
         private readonly array $headers = [],
         private readonly array $query = [],
         private readonly string $body = '',
+        private readonly string $clientIp = '127.0.0.1',
+        private readonly ?string $requestId = null,
     ) {
     }
 
@@ -49,7 +51,9 @@ final class Request
 
         $body = file_get_contents('php://input');
 
-        return new self($method, $uri, $headers, $query, $body === false ? '' : $body);
+        $clientIp = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1';
+
+        return new self($method, $uri, $headers, $query, $body === false ? '' : $body, $clientIp);
     }
 
     public function method(): string
@@ -85,6 +89,51 @@ final class Request
     public function body(): string
     {
         return $this->body;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function form(): array
+    {
+        $values = [];
+        parse_str($this->body, $parsed);
+
+        foreach ($parsed as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $values[$key] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    public function clientIp(): string
+    {
+        return $this->clientIp;
+    }
+
+    public function userAgent(): string
+    {
+        return $this->header('user-agent') ?? '';
+    }
+
+    public function requestId(): string
+    {
+        return $this->requestId ?? '';
+    }
+
+    public function withRequestId(string $requestId): self
+    {
+        return new self(
+            $this->method,
+            $this->uri,
+            $this->headers,
+            $this->query,
+            $this->body,
+            $this->clientIp,
+            $requestId,
+        );
     }
 
     public function cookie(string $name): ?string

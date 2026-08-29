@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ReaCms\Core\Http;
 
+use ReaCms\Auth\AuthController;
+use ReaCms\Auth\AuthServicesFactory;
 use ReaCms\Core\Configuration\Environment;
 use ReaCms\Core\Error\ErrorHandler;
 use ReaCms\Core\Logging\LoggerFactory;
@@ -22,6 +24,10 @@ final class ApplicationFactory
         );
         $errors = new ErrorHandler($logger, $views, $environment->bool('APP_DEBUG'));
         $router = new Router();
+        $auth = static fn (): AuthController => new AuthController(
+            AuthServicesFactory::create($environment),
+            $views,
+        );
 
         $router->get('/', static function (Request $request) use ($views): Response {
             $theme = ThemePreference::parse($request->cookie('rea_theme'));
@@ -39,6 +45,34 @@ final class ApplicationFactory
         ));
 
         $router->get('/health', static fn (): Response => Response::json(['status' => 'ok']));
+        $router->get('/login', static fn (Request $request): Response => $auth()->loginForm($request));
+        $router->post('/login', static fn (Request $request): Response => $auth()->login($request));
+        $router->post('/logout', static fn (Request $request): Response => $auth()->logout($request));
+        $router->get('/admin', static fn (Request $request): Response => $auth()->admin($request));
+        $router->post(
+            '/admin/reauthenticate',
+            static fn (Request $request): Response => $auth()->reauthenticate($request),
+        );
+        $router->post(
+            '/admin/sessions/revoke',
+            static fn (Request $request): Response => $auth()->revokeSession($request),
+        );
+        $router->get(
+            '/forgot-password',
+            static fn (Request $request): Response => $auth()->forgotPasswordForm($request),
+        );
+        $router->post(
+            '/forgot-password',
+            static fn (Request $request): Response => $auth()->forgotPassword($request),
+        );
+        $router->get(
+            '/reset-password',
+            static fn (Request $request): Response => $auth()->resetPasswordForm($request),
+        );
+        $router->post(
+            '/reset-password',
+            static fn (Request $request): Response => $auth()->resetPassword($request),
+        );
 
         return new Application($router, $errors, new SecurityHeaders());
     }

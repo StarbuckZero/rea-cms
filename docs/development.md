@@ -99,6 +99,7 @@ composer install
 npm install
 cp .env.example .env
 php bin/check-platform.php
+php bin/configure-local.php
 php bin/migrate.php
 composer check
 composer security-audit
@@ -130,6 +131,25 @@ php -S 127.0.0.1:8080 -t public
 
 The Apache path must still pass before Phase 1 is accepted because clean-URL
 routing through `.htaccess` is a production requirement.
+
+## Initial administrator
+
+After applying the Phase 2 migration, create the first super administrator. The
+password is read from the process environment and is never accepted as a CLI
+argument or printed:
+
+```bash
+REA_ADMIN_PASSWORD='use-a-long-unique-password' \
+  php bin/create-admin.php --email=admin@example.com --name='Site Administrator'
+```
+
+Use at least 12 characters. Remove the shell command from history if your shell
+records environment assignments; an interactive secret prompt will replace this
+bootstrap mechanism before production packaging.
+
+`bin/configure-local.php` adds missing local-only Phase 2 settings without
+overwriting existing values. Review `MAIL_FROM` before testing password-reset
+delivery. Production must use HTTPS with `SESSION_SECURE_COOKIE=true`.
 
 ## Environment rules
 
