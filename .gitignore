@@ -7,7 +7,6 @@
 /.phpstan.cache/
 /composer.phar
 /node_modules/
-/public/assets/
 /storage/backups/*
 /storage/cache/*
 /storage/logs/*
@@ -29,4 +28,3 @@
 /.vscode/
 .DS_Store
 Thumbs.db
-

@@ -85,8 +85,7 @@ accepted.
 ## Apache
 
 The local virtual host document root must be the repository's `public/`
-directory. That directory will be added in Phase 1 with the front controller;
-do not point Apache at the repository root.
+directory. Do not point Apache at the repository root.
 
 The virtual host must allow `.htaccess` overrides for the public directory and
 must have `mod_rewrite` and `mod_headers` enabled. Apache must not receive broad
@@ -97,15 +96,40 @@ filesystem traversal permissions are needed.
 
 ```bash
 composer install
+npm install
 cp .env.example .env
 php bin/check-platform.php
+php bin/migrate.php
 composer check
 composer security-audit
+npm run build
 ```
 
 `composer check` runs manifest validation, PSR-12 checks, PHPStan, and PHPUnit.
 Dependency auditing is separate so that a temporary advisory service outage
 does not obscure code-quality results.
+
+## Running the Phase 1 application
+
+Enable the existing Apache virtual host and reload Apache:
+
+```bash
+sudo a2ensite rea-cms.conf
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+```
+
+Then open `http://rea-cms.test/`. If the Ubuntu default page appears,
+`rea-cms.conf` is not enabled or Apache has not been reloaded.
+
+For a temporary development server that does not exercise `.htaccess`:
+
+```bash
+php -S 127.0.0.1:8080 -t public
+```
+
+The Apache path must still pass before Phase 1 is accepted because clean-URL
+routing through `.htaccess` is a production requirement.
 
 ## Environment rules
 

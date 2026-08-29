@@ -3,8 +3,9 @@
 Rea CMS (RealTime Efficiency API) is a lightweight, headless-first,
 plugin-based content management system for PHP/MySQL shared hosting.
 
-Development is currently in **Phase 0: repository and hosting discovery**.
-No application or public entry point exists yet.
+Development is currently in **Phase 1: minimal secure core**. The project now
+provides a front controller, server-rendered home page, health endpoint, htmx
+fragment, theme system, and core migration runner.
 
 ## Requirements
 
@@ -28,9 +29,12 @@ cd rea-cms
 nvm install
 nvm use
 composer install
+npm install
 cp .env.example .env
+php bin/migrate.php
 composer check
 composer security-audit
+npm run build
 ```
 
 Set the local database credentials in `.env`. The `.env` file is ignored by
@@ -49,7 +53,14 @@ composer analyse
 composer test
 composer check
 composer security-audit
+npm run build
 ```
+
+Local routes:
+
+- `/` — server-rendered home page
+- `/fragments/welcome` — htmx fragment example
+- `/health` — non-sensitive JSON health response
 
 See [Rea_CMS_Codex_Development_Plan.md](Rea_CMS_Codex_Development_Plan.md)
 for the complete gated development plan.

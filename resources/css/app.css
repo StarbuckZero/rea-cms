@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@source "../views/**/*.php";
+
+@theme {
+  --color-surface: var(--rea-surface);
+  --color-surface-raised: var(--rea-surface-raised);
+  --color-surface-muted: var(--rea-surface-muted);
+  --color-primary: var(--rea-text-primary);
+  --color-secondary: var(--rea-text-secondary);
+  --color-default: var(--rea-border-default);
+  --color-accent: var(--rea-accent-primary);
+  --color-success: var(--rea-status-success);
+  --color-warning: var(--rea-status-warning);
+  --color-danger: var(--rea-status-danger);
+}
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --rea-surface: #f8fafc;
+  --rea-surface-raised: #ffffff;
+  --rea-surface-muted: #e2e8f0;
+  --rea-text-primary: #0f172a;
+  --rea-text-secondary: #475569;
+  --rea-border-default: #cbd5e1;
+  --rea-accent-primary: #2563eb;
+  --rea-status-success: #15803d;
+  --rea-status-warning: #a16207;
+  --rea-status-danger: #b91c1c;
+  --rea-focus-ring: #2563eb;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --rea-surface: #0f172a;
+  --rea-surface-raised: #172033;
+  --rea-surface-muted: #334155;
+  --rea-text-primary: #f8fafc;
+  --rea-text-secondary: #cbd5e1;
+  --rea-border-default: #475569;
+  --rea-accent-primary: #60a5fa;
+  --rea-status-success: #4ade80;
+  --rea-status-warning: #facc15;
+  --rea-status-danger: #f87171;
+  --rea-focus-ring: #93c5fd;
+}
+
+:root[data-theme="high-contrast"] {
+  color-scheme: dark;
+  --rea-surface: #000000;
+  --rea-surface-raised: #000000;
+  --rea-surface-muted: #191919;
+  --rea-text-primary: #ffffff;
+  --rea-text-secondary: #ffffff;
+  --rea-border-default: #ffffff;
+  --rea-accent-primary: #ffff00;
+  --rea-status-success: #00ff66;
+  --rea-status-warning: #ffff00;
+  --rea-status-danger: #ff6666;
+  --rea-focus-ring: #00ffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --rea-surface: #0f172a;
+    --rea-surface-raised: #172033;
+    --rea-surface-muted: #334155;
+    --rea-text-primary: #f8fafc;
+    --rea-text-secondary: #cbd5e1;
+    --rea-border-default: #475569;
+    --rea-accent-primary: #60a5fa;
+    --rea-status-success: #4ade80;
+    --rea-status-warning: #facc15;
+    --rea-status-danger: #f87171;
+    --rea-focus-ring: #93c5fd;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    forced-color-adjust: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--rea-focus-ring);
+    outline-offset: 3px;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .page-shell {
+    width: min(100% - 2rem, 72rem);
+    margin-inline: auto;
+  }
+
+  .skip-link {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 50;
+    transform: translateY(-200%);
+    border-radius: 0.375rem;
+    background: var(--rea-accent-primary);
+    color: var(--rea-surface);
+    padding: 0.75rem 1rem;
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
+  .theme-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .theme-picker button {
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    color: var(--rea-text-secondary);
+  }
+
+  .theme-picker button[aria-pressed="true"] {
+    background: var(--rea-accent-primary);
+    color: var(--rea-surface);
+  }
+
+  .eyebrow {
+    color: var(--rea-accent-primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .button-primary,
+  .button-secondary {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding-inline: 1rem;
+  }
+
+  .button-primary {
+    background: var(--rea-accent-primary);
+    color: var(--rea-surface);
+  }
+
+  .button-secondary {
+    border-color: var(--rea-border-default);
+    color: var(--rea-text-primary);
+  }
+
+  .notice-success {
+    border: 1px solid var(--rea-status-success);
+    border-radius: 0.5rem;
+    color: var(--rea-status-success);
+    padding: 1rem;
+  }
+}
