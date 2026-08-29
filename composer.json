@@ -1,0 +1,53 @@
+{
+  "name": "starbuckzero/rea-cms",
+  "description": "A lightweight, headless-first, plugin-based content management system.",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.2",
+    "ext-fileinfo": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-openssl": "*",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-zip": "*",
+    "vlucas/phpdotenv": "^5.6"
+  },
+  "require-dev": {
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^11.5",
+    "squizlabs/php_codesniffer": "^3.13"
+  },
+  "autoload": {
+    "psr-4": {
+      "ReaCms\\": "app/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "ReaCms\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "security-audit": "composer audit --locked",
+    "check": [
+      "@validate-config",
+      "@cs",
+      "@analyse",
+      "@test"
+    ],
+    "validate-config": "composer validate --strict",
+    "cs": "phpcs",
+    "cs:fix": "phpcbf",
+    "analyse": "phpstan analyse --no-progress --debug",
+    "test": "phpunit"
+  },
+  "config": {
+    "allow-plugins": {},
+    "optimize-autoloader": true,
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

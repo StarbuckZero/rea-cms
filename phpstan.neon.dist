@@ -1,0 +1,9 @@
+parameters:
+  level: 8
+  parallel:
+    maximumNumberOfProcesses: 1
+  paths:
+    - app
+    - config
+  tmpDir: storage/cache/phpstan
+  treatPhpDocTypesAsCertain: false

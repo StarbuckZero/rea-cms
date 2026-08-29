@@ -1,0 +1,32 @@
+/.env
+/.env.*
+!/.env.example
+/.phpunit.cache/
+/.phpunit.result.cache
+/.php-cs-fixer.cache
+/.phpstan.cache/
+/composer.phar
+/node_modules/
+/public/assets/
+/storage/backups/*
+/storage/cache/*
+/storage/logs/*
+/storage/plugins/staging/*
+/storage/sessions/*
+/storage/uploads/*
+/vendor/
+
+# Preserve private runtime directories in Git without committing their contents.
+!/storage/backups/.gitkeep
+!/storage/cache/.gitkeep
+!/storage/logs/.gitkeep
+!/storage/plugins/staging/.gitkeep
+!/storage/sessions/.gitkeep
+!/storage/uploads/.gitkeep
+
+# Local editor and operating-system files.
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+
