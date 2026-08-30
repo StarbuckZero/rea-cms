@@ -3,11 +3,12 @@
 Rea CMS (RealTime Efficiency API) is a lightweight, headless-first,
 plugin-based content management system for PHP/MySQL shared hosting.
 
-Development is currently in **Phase 3: API security platform**. The project now
-provides versioned JSON, HTML, and text representations, deny-by-default policy
-composition, exact-origin CORS controls, hashed scoped API tokens, IPv4/IPv6
-CIDR matching, trusted-proxy-aware client addresses, rate limiting, and bounded
-pagination/filter/sort helpers.
+Development is currently in **Phase 4: plugin platform**. Plugins are
+declarative, versioned ZIP packages inspected before private staging. Manifest,
+file, table, permission, migration, and template boundaries are validated by
+the core; lifecycle services provide disabled-by-default installation, atomic
+file activation, backup and rollback, route gating, audit hooks, data-preserving
+uninstall, and confirmation-protected purge.
 
 ## Requirements
 
@@ -93,3 +94,6 @@ The plaintext token is displayed once. Only its SHA-256 hash is stored.
 
 See [Rea_CMS_Codex_Development_Plan.md](Rea_CMS_Codex_Development_Plan.md)
 for the complete gated development plan.
+
+The declarative package format and lifecycle guarantees are documented in
+[docs/phase-4.md](docs/phase-4.md).

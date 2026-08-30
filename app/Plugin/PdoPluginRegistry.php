@@ -1,0 +1,98 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ReaCms\Plugin;
+
+use JsonException;
+use PDO;
+use RuntimeException;
+
+final class PdoPluginRegistry implements PluginRegistry
+{
+    private readonly string $table;
+
+    public function __construct(private readonly PDO $pdo, string $prefix = 'rea_')
+    {
+        if (preg_match('/^[a-z][a-z0-9_]{0,31}$/', $prefix) !== 1) {
+            throw new RuntimeException('The database table prefix is invalid.');
+        }
+        $this->table = $prefix . 'plugins';
+    }
+
+    public function find(string $pluginId): ?PluginRecord
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'SELECT plugin_id, version, state, package_hash FROM `%s` WHERE plugin_id = :plugin_id LIMIT 1',
+            $this->table,
+        ));
+        $statement->execute(['plugin_id' => $pluginId]);
+        $row = $statement->fetch();
+        return is_array($row) ? new PluginRecord(
+            (string) $row['plugin_id'],
+            (string) $row['version'],
+            (string) $row['state'],
+            (string) $row['package_hash'],
+        ) : null;
+    }
+
+    public function install(StagedPackage $package): void
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'INSERT INTO `%s` '
+            . '(plugin_id, name, version, state, manifest_hash, package_hash, manifest_json) '
+            . 'VALUES (:id, :name, :version, :state, :manifest_hash, :package_hash, :manifest_json)',
+            $this->table,
+        ));
+        $statement->execute($this->values($package, 'disabled'));
+    }
+
+    public function update(StagedPackage $package): void
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'UPDATE `%s` SET name = :name, version = :version, manifest_hash = :manifest_hash, '
+            . 'package_hash = :package_hash, manifest_json = :manifest_json WHERE plugin_id = :id',
+            $this->table,
+        ));
+        $values = $this->values($package, 'disabled');
+        unset($values['state']);
+        $statement->execute($values);
+    }
+
+    public function setState(string $pluginId, string $state): void
+    {
+        if (!in_array($state, ['disabled', 'enabled', 'maintenance', 'uninstalled'], true)) {
+            throw new PluginException('The requested plugin state is invalid.');
+        }
+        $statement = $this->pdo->prepare(sprintf(
+            'UPDATE `%s` SET state = :state WHERE plugin_id = :plugin_id',
+            $this->table,
+        ));
+        $statement->execute(['state' => $state, 'plugin_id' => $pluginId]);
+    }
+
+    public function remove(string $pluginId): void
+    {
+        $statement = $this->pdo->prepare(sprintf('DELETE FROM `%s` WHERE plugin_id = :plugin_id', $this->table));
+        $statement->execute(['plugin_id' => $pluginId]);
+    }
+
+    /** @return array<string, string> */
+    private function values(StagedPackage $package, string $state): array
+    {
+        try {
+            $json = json_encode($package->manifest->document, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        } catch (JsonException $exception) {
+            throw new PluginException('The validated manifest could not be stored.', previous: $exception);
+        }
+        return [
+            'id' => $package->manifest->id,
+            'name' => $package->manifest->name,
+            'version' => $package->manifest->version,
+            'state' => $state,
+            'manifest_hash' => $package->manifest->hash,
+            'package_hash' => $package->packageHash,
+            'manifest_json' => $json,
+        ];
+    }
+}
