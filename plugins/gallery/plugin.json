@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "gallery",
+  "name": "Gallery",
+  "version": "1.0.0",
+  "reaCmsVersion": "^1.0",
+  "description": "Shared-media galleries for Rea CMS.",
+  "tables": ["plugin_gallery_albums", "plugin_gallery_items"],
+  "permissions": ["gallery.albums.view", "gallery.albums.create", "gallery.albums.update", "gallery.albums.delete"],
+  "api": {"resource":"gallery","formats":["json","html","txt"],"defaultPolicy":"same-origin"}
+}

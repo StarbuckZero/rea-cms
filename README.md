@@ -3,11 +3,11 @@
 Rea CMS (RealTime Efficiency API) is a lightweight, headless-first,
 plugin-based content management system for PHP/MySQL shared hosting.
 
-Development is currently in **Phase 6: Blog reference plugin**. The declarative
-Blog package demonstrates plugin-owned posts, categories and revisions,
-editorial lifecycle and SEO fields, shared featured media, public list/detail
-views, JSON/HTML/text APIs, versioned import/export, sitemap output, and strict
-route and publication visibility gates using only public core capabilities.
+Development is currently in **Phase 7: Gallery and operational hardening**. The
+declarative Gallery package reuses core media by logical ID, while core
+operations provide integrity-checked private backup/restore, signed webhook
+delivery with SSRF and DNS-rebinding defenses, performance budgets, rendered
+accessibility validation, and a production HostGator deployment checklist.
 
 ## Requirements
 
@@ -102,3 +102,6 @@ The content, media, and job boundaries are documented in
 
 The Blog package, routes, installer, and integration boundaries are documented
 in [docs/phase-6.md](docs/phase-6.md).
+
+Gallery, backup/restore, webhook, accessibility, and performance guarantees are
+documented in [docs/phase-7.md](docs/phase-7.md).

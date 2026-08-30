@@ -73,8 +73,12 @@ final class BlogController
             htmlspecialchars($post->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
             htmlspecialchars($post->excerpt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
         ), $posts);
-        return Response::html('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Blog</title></head>'
-            . '<body><main><h1>Blog</h1>' . implode('', $items) . '</main></body></html>');
+        return Response::html('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            . '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Blog</title>'
+            . '<link rel="stylesheet" href="/assets/app.css?v=2"></head><body class="bg-surface text-primary">'
+            . '<a class="skip-link" href="#main-content">Skip to main content</a>'
+            . '<main id="main-content" class="page-shell py-12"><h1 class="text-4xl font-bold">Blog</h1>'
+            . implode('', $items) . '</main></body></html>');
     }
 
     public function publicDetail(Request $request, string $slug): Response
@@ -87,9 +91,12 @@ final class BlogController
         if ($post === null) {
             throw new RouteNotFound();
         }
-        return Response::html('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>'
+        return Response::html('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            . '<meta name="viewport" content="width=device-width,initial-scale=1"><title>'
             . htmlspecialchars($post->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
-            . '</title></head><body><main><article><h1>'
+            . '</title><link rel="stylesheet" href="/assets/app.css?v=2"></head><body class="bg-surface text-primary">'
+            . '<a class="skip-link" href="#main-content">Skip to main content</a>'
+            . '<main id="main-content" class="page-shell py-12"><article><h1 class="text-4xl font-bold">'
             . htmlspecialchars($post->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</h1>' . \ReaCms\Plugin\SafeHtml::sanitize($post->content)->value
             . '</article></main></body></html>');

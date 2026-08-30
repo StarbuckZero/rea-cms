@@ -1,0 +1,15 @@
+{
+  "operations":[
+    {"action":"create_table","table":"plugin_gallery_albums","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},{"name":"title","type":"varchar","length":255},
+      {"name":"slug","type":"varchar","length":191},{"name":"description","type":"text"},{"name":"status","type":"varchar","length":32},
+      {"name":"cover_media_id","type":"bigint","nullable":true},{"name":"position","type":"integer"},{"name":"created_at","type":"datetime"},{"name":"updated_at","type":"datetime"}
+    ]},
+    {"action":"create_table","table":"plugin_gallery_items","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},{"name":"album_id","type":"bigint"},
+      {"name":"media_id","type":"bigint"},{"name":"caption","type":"text"},{"name":"alt_text","type":"varchar","length":500},{"name":"position","type":"integer"}
+    ]},
+    {"action":"create_index","table":"plugin_gallery_albums","name":"gallery_album_slug_index","columns":["slug"]},
+    {"action":"create_index","table":"plugin_gallery_items","name":"gallery_item_order_index","columns":["album_id","position"]}
+  ]
+}

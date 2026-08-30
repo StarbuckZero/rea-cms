@@ -1,0 +1,6 @@
+{
+  "resource":"albums",
+  "table":"plugin_gallery_albums",
+  "required":["title","slug","status"],
+  "fields":{"title":"string","slug":"string","description":"text","status":"string","cover_media_id":"media","position":"integer"}
+}
