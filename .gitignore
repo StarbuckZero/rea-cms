@@ -14,6 +14,7 @@
 /storage/sessions/*
 /storage/uploads/*
 /vendor/
+/dist/
 
 # Preserve private runtime directories in Git without committing their contents.
 !/storage/backups/.gitkeep

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @source "../views/**/*.php";
+@source "../../app/**/*.php";
+@source "../../plugins/**/*.html";
 
 @theme {
   --color-surface: var(--rea-surface);

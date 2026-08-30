@@ -986,6 +986,29 @@ Acceptance criteria:
 - WCAG 2.2 AA issues in critical flows are resolved.
 - Production deployment requires no Node process or unsupported daemon.
 
+### Phase 8 — Release readiness
+
+Tasks:
+
+- Close the documented security-regression test matrix.
+- Validate migrations against supported MySQL and MariaDB releases in CI.
+- Build a production artifact that includes compiled assets and production-only
+  PHP dependencies while excluding development and private runtime files.
+- Generate and verify a cryptographic checksum for every release artifact.
+- Document deployment, preflight, backup, rollback, and post-deployment checks.
+- Prepare the first release candidate without publishing or deploying it.
+
+Acceptance criteria:
+
+- The quality, dependency-audit, asset-build, and security-regression gates pass.
+- A clean MySQL 8 and MariaDB 10.11 database can apply every migration twice
+  without errors or duplicate changes.
+- The release archive contains no `.env`, tests, Node dependencies, Git data,
+  logs, sessions, uploads, backups, or development-only PHP packages.
+- The release checksum can detect a modified artifact.
+- Deployment and rollback require no Node process, container, Redis service, or
+  permanent worker daemon on the production host.
+
 ---
 
 ## 19. Testing requirements
@@ -1065,4 +1088,3 @@ When a design choice is not fixed by this specification, prefer the option that 
 3. Lightweight at runtime.
 4. Easy to test.
 5. Easy to replace later through a narrow interface.
-
