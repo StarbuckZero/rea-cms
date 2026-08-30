@@ -3,10 +3,11 @@
 Rea CMS (RealTime Efficiency API) is a lightweight, headless-first,
 plugin-based content management system for PHP/MySQL shared hosting.
 
-Development is currently in **Phase 2: authentication and authorization**. The
-project now provides database-backed secure sessions, login/logout, CSRF,
-roles and permissions, audit events, reauthentication, password reset, session
-revocation, and TOTP/recovery-code foundations.
+Development is currently in **Phase 3: API security platform**. The project now
+provides versioned JSON, HTML, and text representations, deny-by-default policy
+composition, exact-origin CORS controls, hashed scoped API tokens, IPv4/IPv6
+CIDR matching, trusted-proxy-aware client addresses, rate limiting, and bounded
+pagination/filter/sort helpers.
 
 ## Requirements
 
@@ -66,6 +67,29 @@ Local routes:
 - `/login` — administrator sign-in
 - `/forgot-password` — password reset request
 - `/admin` — authenticated and permission-protected administration
+- `/api/v1/status.json` — same-origin JSON API platform status
+- `/api/v1/status.html` — same-origin HTML API platform status
+- `/api/v1/status.txt` — same-origin plain-text API platform status
+
+The default API policy requires an exact configured `Origin` header. For
+example:
+
+```bash
+curl -H 'Origin: http://rea-cms.test' http://rea-cms.test/api/v1/status.json
+```
+
+Additional exact origins can be comma-separated in `API_ALLOWED_ORIGINS`.
+Trusted reverse-proxy networks can be comma-separated in `TRUSTED_PROXIES`;
+forwarded client addresses are ignored unless the immediate peer matches one
+of those networks.
+
+Create a named, scoped API token after migrating with:
+
+```bash
+php bin/create-api-token.php --name='Local integration' --scopes='status:read'
+```
+
+The plaintext token is displayed once. Only its SHA-256 hash is stored.
 
 See [Rea_CMS_Codex_Development_Plan.md](Rea_CMS_Codex_Development_Plan.md)
 for the complete gated development plan.

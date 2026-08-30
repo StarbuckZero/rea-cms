@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ReaCms\Core\Http;
 
+use ReaCms\Api\ApiController;
+use ReaCms\Api\ApiControllerFactory;
 use ReaCms\Auth\AuthController;
 use ReaCms\Auth\AuthServicesFactory;
 use ReaCms\Core\Configuration\Environment;
@@ -28,6 +30,7 @@ final class ApplicationFactory
             AuthServicesFactory::create($environment),
             $views,
         );
+        $api = static fn (): ApiController => ApiControllerFactory::create($environment);
 
         $router->get('/', static function (Request $request) use ($views): Response {
             $theme = ThemePreference::parse($request->cookie('rea_theme'));
@@ -45,6 +48,13 @@ final class ApplicationFactory
         ));
 
         $router->get('/health', static fn (): Response => Response::json(['status' => 'ok']));
+        $router->get(
+            '/api/v1/status.{format}',
+            static fn (Request $request, array $parameters): Response => $api()->status(
+                $request,
+                $parameters['format'],
+            ),
+        );
         $router->get('/login', static fn (Request $request): Response => $auth()->loginForm($request));
         $router->post('/login', static fn (Request $request): Response => $auth()->login($request));
         $router->post('/logout', static fn (Request $request): Response => $auth()->logout($request));

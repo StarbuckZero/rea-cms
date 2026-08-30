@@ -51,7 +51,14 @@ final class Request
 
         $body = file_get_contents('php://input');
 
-        $clientIp = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1';
+        $remoteAddress = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1';
+        $trustedProxyValue = is_string($_ENV['TRUSTED_PROXIES'] ?? null) ? $_ENV['TRUSTED_PROXIES'] : '';
+        $trustedProxies = array_values(array_filter(array_map('trim', explode(',', $trustedProxyValue))));
+        $clientIp = (new ClientIpResolver())->resolve(
+            $remoteAddress,
+            $headers['x-forwarded-for'] ?? null,
+            $trustedProxies,
+        );
 
         return new self($method, $uri, $headers, $query, $body === false ? '' : $body, $clientIp);
     }
