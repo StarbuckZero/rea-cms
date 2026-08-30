@@ -147,6 +147,32 @@ final class AuthControllerTest extends TestCase
         $response = $this->controller->admin($request);
         self::assertSame(200, $response->status());
         self::assertStringContainsString('Welcome, User', $response->body());
+        self::assertStringContainsString('class="profile-menu"', $response->body());
+        self::assertStringContainsString('<span>User</span>', $response->body());
+        self::assertStringContainsString('<summary>Settings</summary>', $response->body());
+        self::assertStringContainsString('data-theme-choice="dark"', $response->body());
+    }
+
+    public function testLogoutClearsAuthenticatedNavigationState(): void
+    {
+        $this->users->users[1] = new User(1, 'user@example.com', 'hash', 'active', 'User');
+        $anonymous = $this->sessions->start(new Request('GET', '/login'));
+        $authenticated = $this->sessions->rotate(new Request('POST', '/login'), $anonymous, 1);
+        $request = new Request(
+            'POST',
+            '/logout',
+            ['cookie' => 'rea_session=' . $authenticated->token],
+            [],
+            http_build_query(['_csrf' => $this->csrf->token($authenticated->token)]),
+        );
+
+        $response = $this->controller->logout($request);
+
+        self::assertSame(303, $response->status());
+        self::assertSame('/login', $response->header('Location'));
+        self::assertStringContainsString('Max-Age=0', $response->header('Set-Cookie') ?? '');
+        self::assertContains($authenticated->record->tokenHash, $this->sessionRepository->revoked);
+        self::assertSame('auth.logout', $this->audit->events[0]['event']);
     }
 
     public function testNamespacedPluginPermissionsRemainExplicit(): void

@@ -43,6 +43,8 @@ final class ApplicationFactory
                 'title' => 'Rea CMS',
                 'theme' => $theme,
                 'content' => $content,
+                'publicHomepage' => true,
+                'authenticatedUser' => null,
             ]));
         });
 

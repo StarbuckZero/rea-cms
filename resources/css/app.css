@@ -134,6 +134,14 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
+    margin-top: 0.75rem;
+  }
+
+  .theme-picker legend {
+    flex-basis: 100%;
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
   }
 
   .theme-picker button {
@@ -145,6 +153,66 @@
   .theme-picker button[aria-pressed="true"] {
     background: var(--rea-accent-primary);
     color: var(--rea-surface);
+  }
+
+  .profile-menu {
+    position: relative;
+  }
+
+  .profile-menu > summary,
+  .settings-menu > summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-weight: 700;
+    gap: 0.625rem;
+    list-style: none;
+  }
+
+  .profile-menu > summary::-webkit-details-marker,
+  .settings-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .profile-menu > summary::after,
+  .settings-menu > summary::after {
+    content: "▾";
+    margin-left: auto;
+  }
+
+  .profile-menu[open] > summary::after,
+  .settings-menu[open] > summary::after {
+    content: "▴";
+  }
+
+  .profile-avatar {
+    align-items: center;
+    background: var(--rea-accent-primary);
+    border-radius: 9999px;
+    color: var(--rea-surface);
+    display: inline-flex;
+    height: 2.25rem;
+    justify-content: center;
+    width: 2.25rem;
+  }
+
+  .profile-menu-panel {
+    background: var(--rea-surface-raised);
+    border: 1px solid var(--rea-border-default);
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 2rem rgb(15 23 42 / 18%);
+    min-width: min(20rem, calc(100vw - 2rem));
+    padding: 1rem;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.75rem);
+    z-index: 20;
+  }
+
+  .settings-menu {
+    border-top: 1px solid var(--rea-border-default);
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
   }
 
   .eyebrow {

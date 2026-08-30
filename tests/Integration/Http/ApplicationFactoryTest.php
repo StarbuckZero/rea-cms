@@ -30,6 +30,9 @@ final class ApplicationFactoryTest extends TestCase
         self::assertSame(200, $response->status());
         self::assertStringContainsString('<html lang="en" data-theme="dark">', $response->body());
         self::assertStringContainsString('hx-get="/fragments/welcome"', $response->body());
+        self::assertStringContainsString('<a class="button-primary" href="/login">Login</a>', $response->body());
+        self::assertStringNotContainsString('class="profile-menu"', $response->body());
+        self::assertStringNotContainsString('data-theme-choice=', $response->body());
     }
 
     public function testFragmentReturnsPresentationOnlyHtml(): void

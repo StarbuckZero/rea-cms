@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use ReaCms\Auth\User;
+
 /** @var callable(mixed): string $escape */
 /** @var string $title */
 /** @var string $theme */
 /** @var string $content */
+/** @var bool $publicHomepage */
+/** @var User|null $authenticatedUser */
 ?>
 <!doctype html>
 <html lang="en" data-theme="<?= $escape($theme) ?>">
@@ -15,22 +19,41 @@ declare(strict_types=1);
     <meta name="color-scheme" content="light dark">
     <title><?= $escape($title) ?></title>
     <script src="/assets/theme.js?v=1"></script>
-    <link rel="stylesheet" href="/assets/app.css?v=2">
+    <link rel="stylesheet" href="/assets/app.css?v=3">
     <script src="/assets/htmx.min.js?v=4.0.0" defer></script>
 </head>
 <body class="min-h-screen bg-surface text-primary antialiased">
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <header class="border-b border-default bg-surface-raised">
         <div class="page-shell flex items-center justify-between gap-4 py-4">
-            <span class="text-lg font-semibold">Rea CMS</span>
-            <fieldset class="theme-picker" aria-label="Color theme">
-                <legend class="sr-only">Color theme</legend>
-                <?php foreach (['system', 'light', 'dark', 'high-contrast'] as $choice): ?>
-                    <button type="button" data-theme-choice="<?= $escape($choice) ?>">
-                        <?= $escape(ucwords(str_replace('-', ' ', $choice))) ?>
-                    </button>
-                <?php endforeach; ?>
-            </fieldset>
+            <a class="text-lg font-semibold" href="/">Rea CMS</a>
+            <?php if ($publicHomepage): ?>
+                <a class="button-primary" href="/login">Login</a>
+            <?php elseif ($authenticatedUser !== null): ?>
+                <details class="profile-menu">
+                    <summary aria-label="Open user profile menu">
+                        <span class="profile-avatar" aria-hidden="true">
+                            <?= $escape(mb_strtoupper(mb_substr($authenticatedUser->displayName, 0, 1))) ?>
+                        </span>
+                        <span><?= $escape($authenticatedUser->displayName) ?></span>
+                    </summary>
+                    <div class="profile-menu-panel">
+                        <p class="text-sm text-secondary">Signed in as</p>
+                        <p class="font-semibold"><?= $escape($authenticatedUser->displayName) ?></p>
+                        <details class="settings-menu">
+                            <summary>Settings</summary>
+                            <fieldset class="theme-picker" aria-label="Color theme">
+                                <legend>Theme</legend>
+                                <?php foreach (['system', 'light', 'dark', 'high-contrast'] as $choice): ?>
+                                    <button type="button" data-theme-choice="<?= $escape($choice) ?>">
+                                        <?= $escape(ucwords(str_replace('-', ' ', $choice))) ?>
+                                    </button>
+                                <?php endforeach; ?>
+                            </fieldset>
+                        </details>
+                    </div>
+                </details>
+            <?php endif; ?>
         </div>
     </header>
     <main id="main-content" class="page-shell py-12" tabindex="-1">

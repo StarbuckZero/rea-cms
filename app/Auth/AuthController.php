@@ -98,6 +98,7 @@ final class AuthController
                 'Access denied',
                 $this->views->render('errors/forbidden'),
                 403,
+                $user,
             ), $session);
         }
 
@@ -110,7 +111,7 @@ final class AuthController
         ]);
 
         return $this->services->sessions->withCookie(
-            $this->renderPage($request, 'Administration', $content),
+            $this->renderPage($request, 'Administration', $content, authenticatedUser: $user),
             $session,
         );
     }
@@ -128,6 +129,7 @@ final class AuthController
                 'Invalid request',
                 $this->views->render('errors/csrf'),
                 419,
+                $user,
             ), $session);
         }
 
@@ -154,6 +156,7 @@ final class AuthController
                 'Invalid request',
                 $this->views->render('errors/csrf'),
                 419,
+                $user,
             ), $session);
         }
 
@@ -167,6 +170,7 @@ final class AuthController
                 'Administration',
                 $this->views->render('admin/reauthentication-failed'),
                 422,
+                $user,
             ), $session);
         }
 
@@ -206,6 +210,7 @@ final class AuthController
                 'Invalid request',
                 $this->views->render('errors/csrf'),
                 419,
+                $user,
             ), $session);
         }
 
@@ -342,12 +347,19 @@ final class AuthController
         ]), $status);
     }
 
-    private function renderPage(Request $request, string $title, string $content, int $status = 200): Response
-    {
+    private function renderPage(
+        Request $request,
+        string $title,
+        string $content,
+        int $status = 200,
+        ?User $authenticatedUser = null,
+    ): Response {
         return Response::html($this->views->render('layouts/base', [
             'title' => $title,
             'theme' => ThemePreference::parse($request->cookie('rea_theme')),
             'content' => $content,
+            'publicHomepage' => false,
+            'authenticatedUser' => $authenticatedUser,
         ]), $status)
             ->withHeader('Cache-Control', 'no-store, private')
             ->withHeader('Pragma', 'no-cache');
