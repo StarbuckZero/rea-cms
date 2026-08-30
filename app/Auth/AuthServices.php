@@ -6,6 +6,7 @@ namespace ReaCms\Auth;
 
 use ReaCms\Audit\AuditLogger;
 use ReaCms\Security\Csrf;
+use ReaCms\Plugin\PluginRegistry;
 
 final class AuthServices
 {
@@ -18,6 +19,7 @@ final class AuthServices
         public readonly AuditLogger $audit,
         public readonly Csrf $csrf,
         public readonly PasswordResetService $passwordReset,
+        public readonly PluginRegistry $plugins,
     ) {
     }
 }

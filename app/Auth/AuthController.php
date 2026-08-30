@@ -23,7 +23,7 @@ final class AuthController
         $session = $this->services->sessions->start($request);
 
         if ($session->isAuthenticated()) {
-            return $this->services->sessions->withCookie(Response::redirect('/admin'), $session);
+            return $this->services->sessions->withCookie(Response::redirect('/dashboard'), $session);
         }
 
         return $this->services->sessions->withCookie($this->renderLogin(
@@ -75,7 +75,30 @@ final class AuthController
         $authenticated = $this->services->sessions->rotate($request, $session, $user->id);
         $this->audit($request, 'auth.login_succeeded', $user->id);
 
-        return $this->services->sessions->withCookie(Response::redirect('/admin'), $authenticated);
+        return $this->services->sessions->withCookie(Response::redirect('/dashboard'), $authenticated);
+    }
+
+    public function dashboard(Request $request): Response
+    {
+        [$session, $user] = $this->authenticated($request);
+
+        if ($user === null) {
+            $response = Response::redirect('/login');
+
+            return $session->record->userId === null
+                ? $this->services->sessions->withCookie($response, $session)
+                : $this->services->sessions->clearCookie($response);
+        }
+
+        $content = $this->views->render('pages/dashboard', [
+            'user' => $user,
+            'plugins' => $this->services->plugins->active(),
+        ]);
+
+        return $this->services->sessions->withCookie(
+            $this->renderPage($request, 'Dashboard', $content, authenticatedUser: $user),
+            $session,
+        );
     }
 
     public function admin(Request $request): Response
@@ -358,8 +381,12 @@ final class AuthController
             'title' => $title,
             'theme' => ThemePreference::parse($request->cookie('rea_theme')),
             'content' => $content,
-            'publicHomepage' => false,
             'authenticatedUser' => $authenticatedUser,
+            'csrfToken' => $authenticatedUser === null ? null : $this->services->csrf->token(
+                $this->services->sessions->start($request)->token,
+            ),
+            'canAccessAdmin' => $authenticatedUser !== null
+                && $this->services->authorization->allows($authenticatedUser->id, 'core.admin.access'),
         ]), $status)
             ->withHeader('Cache-Control', 'no-store, private')
             ->withHeader('Pragma', 'no-cache');

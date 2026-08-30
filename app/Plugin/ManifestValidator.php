@@ -10,7 +10,7 @@ final class ManifestValidator
 {
     private const KEYS = [
         'schemaVersion', 'id', 'name', 'version', 'reaCmsVersion', 'description',
-        'tables', 'permissions', 'api',
+        'tables', 'permissions', 'api', 'navigation',
     ];
 
     public function __construct(private readonly string $cmsVersion = '1.0.0')
@@ -62,6 +62,17 @@ final class ManifestValidator
         foreach ($permissions as $permission) {
             if (preg_match('/^' . preg_quote($id, '/') . '\.[a-z][a-z0-9_.-]{1,190}$/D', $permission) !== 1) {
                 throw new PluginException('A permission escapes the plugin namespace.');
+            }
+        }
+        if (isset($data['navigation'])) {
+            $navigation = $data['navigation'];
+            if (!is_array($navigation) || array_is_list($navigation)
+                || array_diff(array_keys($navigation), ['label', 'path']) !== []
+                || !is_string($navigation['label'] ?? null)
+                || !is_string($navigation['path'] ?? null)
+                || preg_match('#^/cms/[a-z][a-z0-9_-]{1,31}$#D', $navigation['path']) !== 1
+            ) {
+                throw new PluginException('The plugin navigation metadata is invalid.');
             }
         }
 

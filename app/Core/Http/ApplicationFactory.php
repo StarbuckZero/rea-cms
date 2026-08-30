@@ -43,8 +43,9 @@ final class ApplicationFactory
                 'title' => 'Rea CMS',
                 'theme' => $theme,
                 'content' => $content,
-                'publicHomepage' => true,
                 'authenticatedUser' => null,
+                'csrfToken' => null,
+                'canAccessAdmin' => false,
             ]));
         });
 
@@ -86,6 +87,7 @@ final class ApplicationFactory
         $router->get('/login', static fn (Request $request): Response => $auth()->loginForm($request));
         $router->post('/login', static fn (Request $request): Response => $auth()->login($request));
         $router->post('/logout', static fn (Request $request): Response => $auth()->logout($request));
+        $router->get('/dashboard', static fn (Request $request): Response => $auth()->dashboard($request));
         $router->get('/admin', static fn (Request $request): Response => $auth()->admin($request));
         $router->post(
             '/admin/reauthenticate',

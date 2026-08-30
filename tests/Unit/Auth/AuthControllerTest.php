@@ -24,6 +24,8 @@ use ReaCms\Tests\Support\InMemoryLoginThrottle;
 use ReaCms\Tests\Support\InMemoryPasswordResetRepository;
 use ReaCms\Tests\Support\InMemorySessionRepository;
 use ReaCms\Tests\Support\InMemoryUserRepository;
+use ReaCms\Tests\Support\InMemoryPluginRegistry;
+use ReaCms\Plugin\PluginRecord;
 
 final class AuthControllerTest extends TestCase
 {
@@ -35,6 +37,7 @@ final class AuthControllerTest extends TestCase
     private Csrf $csrf;
     private AuthController $controller;
     private PasswordHasher $passwords;
+    private InMemoryPluginRegistry $plugins;
 
     protected function setUp(): void
     {
@@ -56,6 +59,7 @@ final class AuthControllerTest extends TestCase
             $clock,
             'https://cms.example.com',
         );
+        $this->plugins = new InMemoryPluginRegistry();
         $services = new AuthServices(
             $this->users,
             $this->sessionRepository,
@@ -70,6 +74,7 @@ final class AuthControllerTest extends TestCase
             $this->audit,
             $this->csrf,
             $resetService,
+            $this->plugins,
         );
         $this->controller = new AuthController(
             $services,
@@ -85,6 +90,8 @@ final class AuthControllerTest extends TestCase
         self::assertStringContainsString('rea_session=', $response->header('Set-Cookie') ?? '');
         self::assertStringContainsString('name="_csrf"', $response->body());
         self::assertStringNotContainsString('replace-with', $response->body());
+        self::assertStringContainsString('href="/login">Login</a>', $response->body());
+        self::assertStringNotContainsString('class="profile-menu"', $response->body());
     }
 
     public function testLoginRejectsMissingCsrfTokens(): void
@@ -125,7 +132,7 @@ final class AuthControllerTest extends TestCase
         ));
 
         self::assertSame(303, $response->status());
-        self::assertSame('/admin', $response->header('Location'));
+        self::assertSame('/dashboard', $response->header('Location'));
         self::assertStringNotContainsString($initial->token, $response->header('Set-Cookie') ?? '');
         self::assertContains($initial->record->tokenHash, $this->sessionRepository->revoked);
         self::assertSame('auth.login_succeeded', $this->audit->events[0]['event']);
@@ -151,6 +158,42 @@ final class AuthControllerTest extends TestCase
         self::assertStringContainsString('<span>User</span>', $response->body());
         self::assertStringContainsString('<summary>Settings</summary>', $response->body());
         self::assertStringContainsString('data-theme-choice="dark"', $response->body());
+        self::assertStringContainsString('href="/dashboard">Dashboard</a>', $response->body());
+        self::assertStringContainsString('href="/admin">Admin</a>', $response->body());
+        self::assertStringContainsString('>Logout</button>', $response->body());
+    }
+
+    public function testDashboardShowsOnlyActivePluginsFromTheRegistry(): void
+    {
+        $this->users->users[1] = new User(1, 'user@example.com', 'hash', 'active', 'User');
+        $this->plugins->records['blog'] = new PluginRecord(
+            'blog',
+            '1.2.3',
+            'enabled',
+            'hash',
+            'Blog',
+            'Publishing tools.',
+        );
+        $this->plugins->records['gallery'] = new PluginRecord(
+            'gallery',
+            '1.0.0',
+            'disabled',
+            'hash',
+            'Gallery',
+            'Image galleries.',
+        );
+        $anonymous = $this->sessions->start(new Request('GET', '/login'));
+        $authenticated = $this->sessions->rotate(new Request('POST', '/login'), $anonymous, 1);
+        $request = new Request('GET', '/dashboard', ['cookie' => 'rea_session=' . $authenticated->token]);
+
+        $response = $this->controller->dashboard($request);
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('Active plugins', $response->body());
+        self::assertStringContainsString('Blog', $response->body());
+        self::assertStringContainsString('Version 1.2.3', $response->body());
+        self::assertStringContainsString('Publishing tools.', $response->body());
+        self::assertStringNotContainsString('Image galleries.', $response->body());
     }
 
     public function testLogoutClearsAuthenticatedNavigationState(): void

@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "reaCmsVersion": "^1.0",
   "description": "Reference publishing plugin for Rea CMS.",
+  "navigation": {"label": "Blogs", "path": "/cms/blog"},
   "tables": [
     "plugin_blog_posts",
     "plugin_blog_categories",

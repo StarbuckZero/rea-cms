@@ -8,6 +8,7 @@ use ReaCms\Audit\PdoAuditLogger;
 use ReaCms\Core\Configuration\Environment;
 use ReaCms\Database\ConnectionFactory;
 use ReaCms\Security\Csrf;
+use ReaCms\Plugin\PdoPluginRegistry;
 use ReaCms\Support\SystemClock;
 use RuntimeException;
 
@@ -47,6 +48,7 @@ final class AuthServicesFactory
             new PdoAuditLogger($pdo, $prefix),
             new Csrf($environment->require('APP_KEY')),
             $passwordReset,
+            new PdoPluginRegistry($pdo, $prefix),
         );
     }
 

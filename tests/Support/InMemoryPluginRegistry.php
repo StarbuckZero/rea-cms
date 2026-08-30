@@ -19,6 +19,15 @@ final class InMemoryPluginRegistry implements PluginRegistry
         return $this->records[$pluginId] ?? null;
     }
 
+    /** @return list<PluginRecord> */
+    public function active(): array
+    {
+        return array_values(array_filter(
+            $this->records,
+            static fn (PluginRecord $record): bool => $record->state === 'enabled',
+        ));
+    }
+
     public function install(StagedPackage $package): void
     {
         $this->records[$package->manifest->id] = new PluginRecord(

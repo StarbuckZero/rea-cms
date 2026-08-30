@@ -14,6 +14,15 @@
     "description": {"type": "string", "maxLength": 1000},
     "tables": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
     "permissions": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
-    "api": {"type": "object"}
+    "api": {"type": "object"},
+    "navigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "path"],
+      "properties": {
+        "label": {"type": "string", "minLength": 1, "maxLength": 64},
+        "path": {"type": "string", "pattern": "^/cms/[a-z][a-z0-9_-]{1,31}$"}
+      }
+    }
   }
 }

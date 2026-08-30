@@ -11,6 +11,10 @@ final class PluginRecord
         public readonly string $version,
         public readonly string $state,
         public readonly string $packageHash,
+        public readonly string $name = '',
+        public readonly string $description = '',
+        public readonly ?string $navigationLabel = null,
+        public readonly ?string $navigationPath = null,
     ) {
     }
 }

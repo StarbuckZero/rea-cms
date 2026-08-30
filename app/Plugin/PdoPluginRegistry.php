@@ -23,17 +23,33 @@ final class PdoPluginRegistry implements PluginRegistry
     public function find(string $pluginId): ?PluginRecord
     {
         $statement = $this->pdo->prepare(sprintf(
-            'SELECT plugin_id, version, state, package_hash FROM `%s` WHERE plugin_id = :plugin_id LIMIT 1',
+            'SELECT plugin_id, name, version, state, package_hash, manifest_json '
+            . 'FROM `%s` WHERE plugin_id = :plugin_id LIMIT 1',
             $this->table,
         ));
         $statement->execute(['plugin_id' => $pluginId]);
         $row = $statement->fetch();
-        return is_array($row) ? new PluginRecord(
-            (string) $row['plugin_id'],
-            (string) $row['version'],
-            (string) $row['state'],
-            (string) $row['package_hash'],
-        ) : null;
+        return is_array($row) ? $this->record($row) : null;
+    }
+
+    /** @return list<PluginRecord> */
+    public function active(): array
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'SELECT plugin_id, name, version, state, package_hash, manifest_json '
+            . 'FROM `%s` WHERE state = \'enabled\' ORDER BY name, plugin_id',
+            $this->table,
+        ));
+        $statement->execute();
+
+        $records = [];
+        foreach ($statement->fetchAll() as $row) {
+            if (is_array($row)) {
+                $records[] = $this->record($row);
+            }
+        }
+
+        return $records;
     }
 
     public function install(StagedPackage $package): void
@@ -94,5 +110,32 @@ final class PdoPluginRegistry implements PluginRegistry
             'package_hash' => $package->packageHash,
             'manifest_json' => $json,
         ];
+    }
+
+    /** @param array<string, mixed> $row */
+    private function record(array $row): PluginRecord
+    {
+        try {
+            $manifest = json_decode((string) $row['manifest_json'], true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            $manifest = [];
+        }
+
+        return new PluginRecord(
+            (string) $row['plugin_id'],
+            (string) $row['version'],
+            (string) $row['state'],
+            (string) $row['package_hash'],
+            (string) $row['name'],
+            is_array($manifest) && is_string($manifest['description'] ?? null)
+                ? $manifest['description']
+                : '',
+            is_array($manifest) && is_string($manifest['navigation']['label'] ?? null)
+                ? $manifest['navigation']['label']
+                : null,
+            is_array($manifest) && is_string($manifest['navigation']['path'] ?? null)
+                ? $manifest['navigation']['path']
+                : null,
+        );
     }
 }
