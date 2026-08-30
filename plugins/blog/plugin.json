@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "blog",
+  "name": "Blog",
+  "version": "1.0.0",
+  "reaCmsVersion": "^1.0",
+  "description": "Reference publishing plugin for Rea CMS.",
+  "tables": [
+    "plugin_blog_posts",
+    "plugin_blog_categories",
+    "plugin_blog_post_categories",
+    "plugin_blog_revisions"
+  ],
+  "permissions": [
+    "blog.posts.view",
+    "blog.posts.create",
+    "blog.posts.update",
+    "blog.posts.delete",
+    "blog.posts.publish",
+    "blog.settings.manage"
+  ],
+  "api": {
+    "resource": "blog",
+    "formats": ["json", "html", "txt"],
+    "defaultPolicy": "same-origin"
+  }
+}

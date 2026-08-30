@@ -3,11 +3,11 @@
 Rea CMS (RealTime Efficiency API) is a lightweight, headless-first,
 plugin-based content management system for PHP/MySQL shared hosting.
 
-Development is currently in **Phase 5: generic content engine and media**. The
-core now provides namespace-safe metadata-driven CRUD, lifecycle and scheduling,
-revisions, previews, slugs, redirects, taxonomy and relationships, public-search
-visibility enforcement, JSON validation-only imports, shared media validation
-and usage protection, and a MySQL/MariaDB-backed job queue.
+Development is currently in **Phase 6: Blog reference plugin**. The declarative
+Blog package demonstrates plugin-owned posts, categories and revisions,
+editorial lifecycle and SEO fields, shared featured media, public list/detail
+views, JSON/HTML/text APIs, versioned import/export, sitemap output, and strict
+route and publication visibility gates using only public core capabilities.
 
 ## Requirements
 
@@ -99,3 +99,6 @@ The declarative package format and lifecycle guarantees are documented in
 
 The content, media, and job boundaries are documented in
 [docs/phase-5.md](docs/phase-5.md).
+
+The Blog package, routes, installer, and integration boundaries are documented
+in [docs/phase-6.md](docs/phase-6.md).

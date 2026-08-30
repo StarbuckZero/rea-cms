@@ -1,0 +1,27 @@
+{
+  "resource": "posts",
+  "table": "plugin_blog_posts",
+  "required": ["title", "slug", "content", "status", "locale"],
+  "fields": {
+    "title": "string",
+    "slug": "string",
+    "excerpt": "text",
+    "content": "text",
+    "status": "string",
+    "locale": "string",
+    "visibility": "string",
+    "author_id": "integer",
+    "featured_media_id": "media",
+    "seo_title": "string",
+    "meta_description": "text",
+    "canonical_url": "string",
+    "robots": "string",
+    "open_graph": "json",
+    "structured_data": "json",
+    "featured": "boolean",
+    "pinned": "boolean",
+    "position": "integer",
+    "publish_at": "datetime",
+    "unpublish_at": "datetime"
+  }
+}

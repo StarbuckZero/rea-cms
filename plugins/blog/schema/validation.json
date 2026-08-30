@@ -1,0 +1,7 @@
+{
+  "title": {"maxLength": 255},
+  "slug": {"maxLength": 191, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+  "status": {"enum": ["draft", "pending", "scheduled", "published", "archived", "trashed"]},
+  "locale": {"maxLength": 35},
+  "meta_description": {"maxLength": 320}
+}

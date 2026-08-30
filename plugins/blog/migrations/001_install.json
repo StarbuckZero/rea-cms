@@ -1,0 +1,32 @@
+{
+  "operations": [
+    {"action":"create_table","table":"plugin_blog_posts","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},
+      {"name":"title","type":"varchar","length":255},{"name":"slug","type":"varchar","length":191},
+      {"name":"excerpt","type":"text"},{"name":"content","type":"text"},{"name":"status","type":"varchar","length":32},
+      {"name":"locale","type":"varchar","length":35},{"name":"visibility","type":"varchar","length":16},
+      {"name":"author_id","type":"bigint"},{"name":"featured_media_id","type":"bigint","nullable":true},
+      {"name":"seo_title","type":"varchar","length":255},{"name":"meta_description","type":"text"},
+      {"name":"canonical_url","type":"varchar","length":500},{"name":"robots","type":"varchar","length":100},
+      {"name":"open_graph","type":"json"},{"name":"structured_data","type":"json"},
+      {"name":"featured","type":"boolean"},{"name":"pinned","type":"boolean"},{"name":"position","type":"integer"},
+      {"name":"publish_at","type":"datetime","nullable":true},{"name":"unpublish_at","type":"datetime","nullable":true},
+      {"name":"created_at","type":"datetime"},{"name":"updated_at","type":"datetime"},{"name":"deleted_at","type":"datetime","nullable":true}
+    ]},
+    {"action":"create_table","table":"plugin_blog_categories","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},{"name":"name","type":"varchar","length":191},
+      {"name":"slug","type":"varchar","length":191},{"name":"description","type":"text"},{"name":"parent_id","type":"bigint","nullable":true}
+    ]},
+    {"action":"create_table","table":"plugin_blog_post_categories","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},{"name":"post_id","type":"bigint"},
+      {"name":"category_id","type":"bigint"},{"name":"position","type":"integer"}
+    ]},
+    {"action":"create_table","table":"plugin_blog_revisions","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},{"name":"post_id","type":"bigint"},
+      {"name":"revision_number","type":"integer"},{"name":"actor_user_id","type":"bigint","nullable":true},
+      {"name":"snapshot","type":"json"},{"name":"created_at","type":"datetime"}
+    ]},
+    {"action":"create_index","table":"plugin_blog_posts","name":"blog_posts_slug_index","columns":["slug"]},
+    {"action":"create_index","table":"plugin_blog_posts","name":"blog_posts_public_index","columns":["status","visibility","locale","publish_at"]}
+  ]
+}

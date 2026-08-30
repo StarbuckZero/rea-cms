@@ -8,6 +8,8 @@ use ReaCms\Api\ApiController;
 use ReaCms\Api\ApiControllerFactory;
 use ReaCms\Auth\AuthController;
 use ReaCms\Auth\AuthServicesFactory;
+use ReaCms\Blog\BlogController;
+use ReaCms\Blog\BlogControllerFactory;
 use ReaCms\Core\Configuration\Environment;
 use ReaCms\Core\Error\ErrorHandler;
 use ReaCms\Core\Logging\LoggerFactory;
@@ -31,6 +33,7 @@ final class ApplicationFactory
             $views,
         );
         $api = static fn (): ApiController => ApiControllerFactory::create($environment);
+        $blog = static fn (): BlogController => BlogControllerFactory::create($environment);
 
         $router->get('/', static function (Request $request) use ($views): Response {
             $theme = ThemePreference::parse($request->cookie('rea_theme'));
@@ -52,6 +55,29 @@ final class ApplicationFactory
             '/api/v1/status.{format}',
             static fn (Request $request, array $parameters): Response => $api()->status(
                 $request,
+                $parameters['format'],
+            ),
+        );
+        $router->get('/blog', static fn (Request $request): Response => $blog()->publicIndex($request));
+        $router->get(
+            '/blog/{slug}',
+            static fn (Request $request, array $parameters): Response => $blog()->publicDetail(
+                $request,
+                $parameters['slug'],
+            ),
+        );
+        $router->get(
+            '/api/v1/blog.{format}',
+            static fn (Request $request, array $parameters): Response => $blog()->collection(
+                $request,
+                $parameters['format'],
+            ),
+        );
+        $router->get(
+            '/api/v1/blog/{id}.{format}',
+            static fn (Request $request, array $parameters): Response => $blog()->item(
+                $request,
+                (int) $parameters['id'],
                 $parameters['format'],
             ),
         );
