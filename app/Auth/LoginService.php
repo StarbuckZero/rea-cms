@@ -57,4 +57,9 @@ final class LoginService
             throw new RuntimeException('Reauthentication failed.');
         }
     }
+
+    public function hashPassword(string $password): string
+    {
+        return $this->passwords->hash($password);
+    }
 }

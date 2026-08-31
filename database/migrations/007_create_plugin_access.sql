@@ -4,9 +4,7 @@ CREATE TABLE IF NOT EXISTS `{{prefix}}user_plugin_access` (
     `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`user_id`, `plugin_id`),
     CONSTRAINT `user_plugin_access_user_fk` FOREIGN KEY (`user_id`)
-        REFERENCES `{{prefix}}users` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `user_plugin_access_plugin_fk` FOREIGN KEY (`plugin_id`)
-        REFERENCES `{{prefix}}plugins` (`plugin_id`) ON DELETE CASCADE
+        REFERENCES `{{prefix}}users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO `{{prefix}}permissions` (`permission_key`, `description`) VALUES

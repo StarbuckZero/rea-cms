@@ -25,4 +25,41 @@ final class GalleryPackageTest extends TestCase
         self::assertStringNotContainsString('file_hash', $sql);
         self::assertSame([], glob($root . '/**/*.php') ?: []);
     }
+
+    public function testGalleryDeclaresMixedMediaAndAlbumCapabilities(): void
+    {
+        $root = dirname(__DIR__, 3) . '/plugins/gallery';
+        $manifestJson = file_get_contents($root . '/plugin.json');
+        $migrationJson = file_get_contents($root . '/migrations/003_media_types.json');
+        self::assertIsString($manifestJson);
+        self::assertIsString($migrationJson);
+
+        $manifest = (new ManifestValidator())->validate($manifestJson);
+        $sql = implode(' ', (new DeclarativeMigration())->compile('gallery', $manifest, $migrationJson));
+
+        self::assertSame('1.1.0', $manifest->version);
+        self::assertContains('gallery.items.create', $manifest->permissions);
+        self::assertContains('gallery.albums.delete', $manifest->permissions);
+        self::assertStringContainsString('`media_type` VARCHAR(16) NULL', $sql);
+        self::assertStringContainsString('gallery_item_status_index', $sql);
+    }
+
+    public function testGalleryRoutesAndAdminViewsCoverItemsAndAlbums(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $factory = file_get_contents($root . '/app/Core/Http/ApplicationFactory.php');
+        $itemEditor = file_get_contents($root . '/resources/views/cms/gallery/editor.php');
+        $albumEditor = file_get_contents($root . '/resources/views/cms/gallery/album-editor.php');
+        self::assertIsString($factory);
+        self::assertIsString($itemEditor);
+        self::assertIsString($albumEditor);
+
+        self::assertStringContainsString('/api/v1/gallery/{id}.{format}', $factory);
+        self::assertStringContainsString('/api/v1/gallery/albums.{format}', $factory);
+        self::assertStringContainsString('/api/v1/gallery/albums/{id}/items.{format}', $factory);
+        self::assertStringContainsString('name="album_id"', $itemEditor);
+        self::assertStringContainsString('name="cover_media_id"', $albumEditor);
+        self::assertStringContainsString('/reorder', $albumEditor);
+        self::assertFileExists($root . '/public/assets/gallery-default-album-cover.svg');
+    }
 }

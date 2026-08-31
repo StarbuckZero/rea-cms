@@ -11,6 +11,7 @@ final class MediaIngestor
     private const MIME_EXTENSIONS = [
         'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp',
         'application/pdf' => 'pdf', 'audio/mpeg' => 'mp3', 'video/mp4' => 'mp4',
+        'video/webm' => 'webm', 'video/quicktime' => 'mov',
     ];
 
     /** @var callable(string, string): bool */

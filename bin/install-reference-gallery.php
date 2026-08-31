@@ -33,6 +33,8 @@ $registry = new PdoPluginRegistry($pdo, $prefix);
 $installed = $registry->find('gallery');
 if ($installed === null) {
     $registry->install($package);
+} else {
+    $registry->update($package);
 }
 try {
     (new PdoPluginMigrationRunner($pdo, prefix: $prefix))->apply($package);

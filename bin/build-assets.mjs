@@ -10,6 +10,14 @@ await copyFile(
   new URL("../public/assets/theme.js", import.meta.url),
 );
 await copyFile(
+  new URL("../resources/js/navigation.js", import.meta.url),
+  new URL("../public/assets/navigation.js", import.meta.url),
+);
+await copyFile(
   new URL("../resources/js/reset-password.js", import.meta.url),
   new URL("../public/assets/reset-password.js", import.meta.url),
+);
+await copyFile(
+  new URL("../resources/js/editor.js", import.meta.url),
+  new URL("../public/assets/editor.js", import.meta.url),
 );

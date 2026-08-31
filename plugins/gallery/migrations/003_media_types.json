@@ -1,0 +1,9 @@
+{
+  "operations": [
+    {"action":"add_column","table":"plugin_gallery_items","column":{"name":"media_type","type":"varchar","length":16,"nullable":true}},
+    {"action":"add_column","table":"plugin_gallery_items","column":{"name":"created_at","type":"datetime","nullable":true}},
+    {"action":"add_column","table":"plugin_gallery_items","column":{"name":"updated_at","type":"datetime","nullable":true}},
+    {"action":"create_index","table":"plugin_gallery_items","name":"gallery_item_status_index","columns":["status","position"]},
+    {"action":"create_index","table":"plugin_gallery_albums","name":"gallery_album_status_index","columns":["status","position"]}
+  ]
+}

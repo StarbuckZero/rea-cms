@@ -36,6 +36,25 @@ final class PdoUserRepository implements UserRepository
         return $this->find('users.id = :value', $id);
     }
 
+    public function all(): array
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'SELECT users.id, users.email, users.password_hash, users.status, profiles.display_name '
+                . 'FROM `%s` AS users JOIN `%s` AS profiles ON profiles.user_id = users.id '
+                . 'WHERE users.deleted_at IS NULL ORDER BY users.email',
+            $this->users,
+            $this->profiles,
+        ));
+        $statement->execute();
+        $users = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (is_array($row)) {
+                $users[] = $this->hydrate($row);
+            }
+        }
+        return $users;
+    }
+
     public function create(string $email, string $passwordHash, string $displayName, string $status = 'active'): int
     {
         $this->pdo->beginTransaction();
@@ -81,6 +100,38 @@ final class PdoUserRepository implements UserRepository
         $statement->execute(['password_hash' => $passwordHash, 'user_id' => $userId]);
     }
 
+    public function update(int $userId, string $email, string $displayName, string $status): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $user = $this->pdo->prepare(sprintf(
+                'UPDATE `%s` SET email = :email, status = :status WHERE id = :id AND deleted_at IS NULL',
+                $this->users,
+            ));
+            $user->execute(['email' => strtolower(trim($email)), 'status' => $status, 'id' => $userId]);
+            $profile = $this->pdo->prepare(sprintf(
+                'UPDATE `%s` SET display_name = :display_name WHERE user_id = :id',
+                $this->profiles,
+            ));
+            $profile->execute(['display_name' => trim($displayName), 'id' => $userId]);
+            $this->pdo->commit();
+        } catch (\Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
+    public function delete(int $userId): void
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'UPDATE `%s` SET status = :status, deleted_at = CURRENT_TIMESTAMP(6) WHERE id = :id',
+            $this->users,
+        ));
+        $statement->execute(['status' => 'disabled', 'id' => $userId]);
+    }
+
     public function markLogin(int $userId): void
     {
         $statement = $this->pdo->prepare(sprintf(
@@ -118,6 +169,12 @@ final class PdoUserRepository implements UserRepository
             return null;
         }
 
+        return $this->hydrate($row);
+    }
+
+    /** @param array<string, mixed> $row */
+    private function hydrate(array $row): User
+    {
         return new User(
             (int) $row['id'],
             (string) $row['email'],

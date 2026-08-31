@@ -8,7 +8,9 @@ use ReaCms\Core\Http\Request;
 use ReaCms\Core\Http\Response;
 use ReaCms\Core\Theme\ThemePreference;
 use ReaCms\Core\View\ViewRenderer;
+use ReaCms\Plugin\PluginNavigation;
 use RuntimeException;
+use ReaCms\Plugin\PluginRecord;
 
 final class AuthController
 {
@@ -92,7 +94,10 @@ final class AuthController
 
         $content = $this->views->render('pages/dashboard', [
             'user' => $user,
-            'plugins' => $this->services->plugins->active(),
+            'plugins' => array_values(array_filter(
+                $this->services->plugins->active(),
+                fn ($plugin): bool => $this->services->pluginAccess->allows($user->id, $plugin->id),
+            )),
         ]);
 
         return $this->services->sessions->withCookie(
@@ -131,12 +136,81 @@ final class AuthController
             'reauthenticatedAt' => $session->record->reauthenticatedAt?->format(DATE_ATOM),
             'sessions' => $this->services->sessions->listForUser($user->id),
             'currentSessionHash' => $session->record->tokenHash,
+            'users' => $this->services->users->all(),
+            'plugins' => [...$this->services->plugins->active(), new PluginRecord(
+                'media',
+                '1.0.0',
+                'enabled',
+                '',
+                'Media',
+                'Shared images and files.',
+            )],
+            'pluginAccess' => $this->services->pluginAccess,
         ]);
 
         return $this->services->sessions->withCookie(
             $this->renderPage($request, 'Administration', $content, authenticatedUser: $user),
             $session,
         );
+    }
+
+    public function createUser(Request $request): Response
+    {
+        [$session, $admin] = $this->requireAdministrator($request);
+        if ($admin === null) {
+            return $this->admin($request);
+        }
+        $form = $request->form();
+        if (!$this->services->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $admin, '/admin/users');
+        }
+        $email = strtolower(trim($form['email'] ?? ''));
+        $name = trim($form['display_name'] ?? '');
+        $password = $form['password'] ?? '';
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '' || strlen($password) < 12) {
+            return $this->services->sessions->withCookie(Response::redirect('/admin?user_error=1'), $session);
+        }
+        $userId = $this->services->users->create($email, $this->services->login->hashPassword($password), $name);
+        $this->services->pluginAccess->replaceForUser($userId, $this->selectedPlugins($form));
+        $this->audit($request, 'admin.user_created', $admin->id, ['user_id' => $userId]);
+        return $this->services->sessions->withCookie(Response::redirect('/admin'), $session);
+    }
+
+    public function updateUser(Request $request, int $userId): Response
+    {
+        [$session, $admin] = $this->requireAdministrator($request);
+        if ($admin === null) {
+            return $this->admin($request);
+        }
+        $form = $request->form();
+        if (!$this->services->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $admin, '/admin/users/' . $userId);
+        }
+        $status = ($form['status'] ?? '') === 'active' ? 'active' : 'disabled';
+        $this->services->users->update($userId, $form['email'] ?? '', $form['display_name'] ?? '', $status);
+        if (($form['password'] ?? '') !== '') {
+            $this->services->users->updatePassword($userId, $this->services->login->hashPassword($form['password']));
+        }
+        $this->services->pluginAccess->replaceForUser($userId, $this->selectedPlugins($form));
+        $this->audit($request, 'admin.user_updated', $admin->id, ['user_id' => $userId]);
+        return $this->services->sessions->withCookie(Response::redirect('/admin'), $session);
+    }
+
+    public function deleteUser(Request $request, int $userId): Response
+    {
+        [$session, $admin] = $this->requireAdministrator($request);
+        if ($admin === null) {
+            return $this->admin($request);
+        }
+        $form = $request->form();
+        if (!$this->services->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $admin, '/admin/users/' . $userId . '/delete');
+        }
+        if ($admin->id !== $userId) {
+            $this->services->users->delete($userId);
+            $this->audit($request, 'admin.user_deleted', $admin->id, ['user_id' => $userId]);
+        }
+        return $this->services->sessions->withCookie(Response::redirect('/admin'), $session);
     }
 
     public function logout(Request $request): Response
@@ -358,6 +432,45 @@ final class AuthController
         return [$session, $user];
     }
 
+    /** @return array{SessionContext, User|null} */
+    private function requireAdministrator(Request $request): array
+    {
+        [$session, $user] = $this->authenticated($request);
+        if ($user === null || !$this->services->authorization->allows($user->id, 'core.admin.access')) {
+            return [$session, null];
+        }
+        return [$session, $user];
+    }
+
+    /** @param array<string, string> $form
+     * @return list<string>
+     */
+    private function selectedPlugins(array $form): array
+    {
+        $selected = [];
+        foreach ($this->services->plugins->active() as $plugin) {
+            if (($form['plugin_' . $plugin->id] ?? '') === '1') {
+                $selected[] = $plugin->id;
+            }
+        }
+        if (($form['plugin_media'] ?? '') === '1') {
+            $selected[] = 'media';
+        }
+        return $selected;
+    }
+
+    private function csrfFailure(Request $request, SessionContext $session, User $user, string $route): Response
+    {
+        $this->audit($request, 'auth.csrf_failed', $user->id, ['route' => $route]);
+        return $this->services->sessions->withCookie($this->renderPage(
+            $request,
+            'Invalid request',
+            $this->views->render('errors/csrf'),
+            419,
+            $user,
+        ), $session);
+    }
+
     private function renderLogin(
         Request $request,
         string $csrfToken,
@@ -387,6 +500,10 @@ final class AuthController
             ),
             'canAccessAdmin' => $authenticatedUser !== null
                 && $this->services->authorization->allows($authenticatedUser->id, 'core.admin.access'),
+            'pluginNavigation' => $authenticatedUser === null ? [] : (new PluginNavigation(
+                $this->services->plugins,
+                $this->services->pluginAccess,
+            ))->forUser($authenticatedUser->id),
         ]), $status)
             ->withHeader('Cache-Control', 'no-store, private')
             ->withHeader('Pragma', 'no-cache');

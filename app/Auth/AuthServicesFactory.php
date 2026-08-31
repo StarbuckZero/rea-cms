@@ -9,6 +9,7 @@ use ReaCms\Core\Configuration\Environment;
 use ReaCms\Database\ConnectionFactory;
 use ReaCms\Security\Csrf;
 use ReaCms\Plugin\PdoPluginRegistry;
+use ReaCms\Plugin\PdoPluginAccess;
 use ReaCms\Support\SystemClock;
 use RuntimeException;
 
@@ -39,16 +40,18 @@ final class AuthServicesFactory
             $environment->require('APP_URL'),
         );
 
+        $authorization = new PdoAuthorization($pdo, $prefix);
         return new AuthServices(
             $users,
             $sessionRepository,
             $sessions,
             new LoginService($users, new PdoLoginThrottle($pdo, $prefix), $passwords, $clock),
-            new PdoAuthorization($pdo, $prefix),
+            $authorization,
             new PdoAuditLogger($pdo, $prefix),
             new Csrf($environment->require('APP_KEY')),
             $passwordReset,
             new PdoPluginRegistry($pdo, $prefix),
+            new PdoPluginAccess($pdo, $authorization, $prefix),
         );
     }
 

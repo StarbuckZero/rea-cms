@@ -1,0 +1,6 @@
+{
+  "operations": [
+    {"action":"add_column","table":"plugin_gallery_items","column":{"name":"title","type":"varchar","length":255,"nullable":true}},
+    {"action":"add_column","table":"plugin_gallery_items","column":{"name":"status","type":"varchar","length":32,"nullable":true}}
+  ]
+}

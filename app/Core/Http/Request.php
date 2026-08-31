@@ -106,6 +106,10 @@ final class Request
         $values = [];
         parse_str($this->body, $parsed);
 
+        if ($parsed === [] && str_starts_with(strtolower($this->header('content-type') ?? ''), 'multipart/form-data')) {
+            $parsed = $_POST;
+        }
+
         foreach ($parsed as $key => $value) {
             if (is_string($key) && is_string($value)) {
                 $values[$key] = $value;

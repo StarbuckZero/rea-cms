@@ -66,7 +66,8 @@ final class ManifestValidator
         }
         if (isset($data['navigation'])) {
             $navigation = $data['navigation'];
-            if (!is_array($navigation) || array_is_list($navigation)
+            if (
+                !is_array($navigation) || array_is_list($navigation)
                 || array_diff(array_keys($navigation), ['label', 'path']) !== []
                 || !is_string($navigation['label'] ?? null)
                 || !is_string($navigation['path'] ?? null)

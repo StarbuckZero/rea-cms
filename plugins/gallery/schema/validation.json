@@ -1,1 +1,10 @@
-{"status":{"enum":["draft","published","archived","trashed"]},"slug":{"pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}}
+{
+  "albums": {
+    "status":{"enum":["draft","published","archived","trashed"]},
+    "slug":{"pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}
+  },
+  "items": {
+    "status":{"enum":["active","inactive"]},
+    "media_type":{"enum":["image","video"]}
+  }
+}

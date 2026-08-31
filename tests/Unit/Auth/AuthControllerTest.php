@@ -25,6 +25,7 @@ use ReaCms\Tests\Support\InMemoryPasswordResetRepository;
 use ReaCms\Tests\Support\InMemorySessionRepository;
 use ReaCms\Tests\Support\InMemoryUserRepository;
 use ReaCms\Tests\Support\InMemoryPluginRegistry;
+use ReaCms\Tests\Support\InMemoryPluginAccess;
 use ReaCms\Plugin\PluginRecord;
 
 final class AuthControllerTest extends TestCase
@@ -38,6 +39,7 @@ final class AuthControllerTest extends TestCase
     private AuthController $controller;
     private PasswordHasher $passwords;
     private InMemoryPluginRegistry $plugins;
+    private InMemoryPluginAccess $pluginAccess;
 
     protected function setUp(): void
     {
@@ -60,6 +62,7 @@ final class AuthControllerTest extends TestCase
             'https://cms.example.com',
         );
         $this->plugins = new InMemoryPluginRegistry();
+        $this->pluginAccess = new InMemoryPluginAccess();
         $services = new AuthServices(
             $this->users,
             $this->sessionRepository,
@@ -75,6 +78,7 @@ final class AuthControllerTest extends TestCase
             $this->csrf,
             $resetService,
             $this->plugins,
+            $this->pluginAccess,
         );
         $this->controller = new AuthController(
             $services,
@@ -154,13 +158,73 @@ final class AuthControllerTest extends TestCase
         $response = $this->controller->admin($request);
         self::assertSame(200, $response->status());
         self::assertStringContainsString('Welcome, User', $response->body());
-        self::assertStringContainsString('class="profile-menu"', $response->body());
-        self::assertStringContainsString('<span>User</span>', $response->body());
+        self::assertStringContainsString('class="navigation-menu plugins-menu"', $response->body());
+        self::assertStringContainsString('class="navigation-menu profile-menu"', $response->body());
+        self::assertStringContainsString('<span class="profile-name">User</span>', $response->body());
         self::assertStringContainsString('<summary>Settings</summary>', $response->body());
         self::assertStringContainsString('data-theme-choice="dark"', $response->body());
         self::assertStringContainsString('href="/dashboard">Dashboard</a>', $response->body());
         self::assertStringContainsString('href="/admin">Admin</a>', $response->body());
         self::assertStringContainsString('>Logout</button>', $response->body());
+    }
+
+    public function testPluginNavigationUsesManifestMetadataAndUserAccess(): void
+    {
+        $this->users->users[1] = new User(1, 'user@example.com', 'hash', 'active', 'User');
+        $this->plugins->records['blog'] = new PluginRecord(
+            'blog',
+            '1.2.3',
+            'enabled',
+            'hash',
+            'Blog',
+            'Publishing tools.',
+            'Posts',
+            '/cms/blog',
+        );
+        $this->plugins->records['gallery'] = new PluginRecord(
+            'gallery',
+            '1.0.0',
+            'enabled',
+            'hash',
+            'Gallery',
+            'Image galleries.',
+            'Gallery',
+            '/cms/gallery',
+        );
+        $this->plugins->records['headless'] = new PluginRecord(
+            'headless',
+            '1.0.0',
+            'enabled',
+            'hash',
+            'Headless',
+            'No navigation metadata.',
+        );
+        $this->pluginAccess->allowAll = false;
+        $this->pluginAccess->assignments[1] = ['blog', 'headless'];
+        $anonymous = $this->sessions->start(new Request('GET', '/login'));
+        $authenticated = $this->sessions->rotate(new Request('POST', '/login'), $anonymous, 1);
+        $request = new Request('GET', '/dashboard', ['cookie' => 'rea_session=' . $authenticated->token]);
+
+        $body = $this->controller->dashboard($request)->body();
+        $pluginsStart = strpos($body, 'class="navigation-menu plugins-menu"');
+        $profileStart = strpos($body, 'class="navigation-menu profile-menu"');
+
+        self::assertIsInt($pluginsStart);
+        self::assertIsInt($profileStart);
+        self::assertGreaterThan($pluginsStart, $profileStart);
+        $pluginsMenu = substr($body, $pluginsStart, $profileStart - $pluginsStart);
+        self::assertStringContainsString('href="/cms/blog"', $pluginsMenu);
+        self::assertStringContainsString('Posts', $pluginsMenu);
+        self::assertStringNotContainsString('/cms/gallery', $pluginsMenu);
+        self::assertStringNotContainsString('/cms/media', $pluginsMenu);
+
+        $profileMenu = substr($body, $profileStart);
+        self::assertStringNotContainsString('/cms/blog', $profileMenu);
+        self::assertStringContainsString('href="/dashboard"', $profileMenu);
+        self::assertStringContainsString('<summary>Settings</summary>', $profileMenu);
+        self::assertStringContainsString('>Logout</button>', $profileMenu);
+        self::assertSame(2, substr_count($body, 'name="main-navigation" data-navigation-menu'));
+        self::assertStringContainsString('/assets/navigation.js?v=1', $body);
     }
 
     public function testDashboardShowsOnlyActivePluginsFromTheRegistry(): void

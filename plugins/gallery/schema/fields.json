@@ -1,6 +1,14 @@
 {
-  "resource":"albums",
-  "table":"plugin_gallery_albums",
-  "required":["title","slug","status"],
-  "fields":{"title":"string","slug":"string","description":"text","status":"string","cover_media_id":"media","position":"integer"}
+  "resources": {
+    "albums": {
+      "table":"plugin_gallery_albums",
+      "required":["title","slug","status"],
+      "fields":{"title":"string","slug":"string","description":"text","status":"string","cover_media_id":"media","position":"integer"}
+    },
+    "items": {
+      "table":"plugin_gallery_items",
+      "required":["media_id","media_type","status"],
+      "fields":{"album_id":"integer","media_id":"media","media_type":"string","title":"string","caption":"text","alt_text":"string","position":"integer","status":"string"}
+    }
+  }
 }

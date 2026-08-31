@@ -34,6 +34,11 @@ final class InMemoryUserRepository implements UserRepository
         return $this->users[$id] ?? null;
     }
 
+    public function all(): array
+    {
+        return array_values($this->users);
+    }
+
     public function create(string $email, string $passwordHash, string $displayName, string $status = 'active'): int
     {
         $id = count($this->users) + 1;
@@ -52,6 +57,19 @@ final class InMemoryUserRepository implements UserRepository
             $user->status,
             $user->displayName,
         );
+    }
+
+    public function update(int $userId, string $email, string $displayName, string $status): void
+    {
+        $existing = $this->users[$userId] ?? null;
+        if ($existing !== null) {
+            $this->users[$userId] = new User($userId, $email, $existing->passwordHash, $status, $displayName);
+        }
+    }
+
+    public function delete(int $userId): void
+    {
+        unset($this->users[$userId]);
     }
 
     public function markLogin(int $userId): void
