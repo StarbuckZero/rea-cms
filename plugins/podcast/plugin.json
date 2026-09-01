@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "podcast",
+  "name": "Podcast Feeds",
+  "version": "1.0.0",
+  "reaCmsVersion": "^1.0",
+  "description": "Database-backed podcast RSS synchronization and cached API feeds.",
+  "author": "Rea CMS",
+  "navigation": {"label": "Podcast Feeds", "path": "/cms/podcast"},
+  "tables": [
+    "plugin_podcast_feeds",
+    "plugin_podcast_episodes",
+    "plugin_podcast_settings"
+  ],
+  "permissions": [
+    "podcast.feeds.view",
+    "podcast.feeds.create",
+    "podcast.feeds.update",
+    "podcast.feeds.delete",
+    "podcast.feeds.refresh",
+    "podcast.settings.manage"
+  ],
+  "api": {
+    "resource": "podcast",
+    "formats": ["json", "html", "txt"],
+    "defaultPolicy": "same-origin"
+  }
+}

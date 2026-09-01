@@ -71,6 +71,16 @@ Local routes:
 - `/api/v1/status.html` — same-origin HTML API platform status
 - `/api/v1/status.txt` — same-origin plain-text API platform status
 
+The bundled Podcast Feed plugin can be installed and enabled with:
+
+```bash
+php bin/install-reference-podcast.php --enable
+```
+
+It adds `/cms/podcast`, cached podcast APIs under `/api/v1/podcast`, and the
+short-lived `php bin/refresh-podcast-feeds.php` cron command. See
+[plugins/podcast/README.md](plugins/podcast/README.md) for endpoint details.
+
 The default API policy requires an exact configured `Origin` header. For
 example:
 

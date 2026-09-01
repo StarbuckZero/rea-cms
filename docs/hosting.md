@@ -84,13 +84,15 @@ SELECT @@collation_server;
 5. Keep media, staging, backup, logs, and sessions outside `public_html` where
    possible. Grant only the PHP account read/write access; backup and upload
    files must never be executable or directly downloadable.
-6. Select PHP 8.2+ and confirm PDO MySQL, JSON, mbstring, OpenSSL, fileinfo, ZIP,
-   and GD or ImageMagick. Confirm MariaDB/MySQL uses `utf8mb4` and a compatible
-   SQL mode.
+6. Select PHP 8.2+ and confirm PDO MySQL, cURL, DOM, JSON, mbstring, OpenSSL,
+   fileinfo, ZIP, and GD or ImageMagick. Confirm MariaDB/MySQL uses `utf8mb4`
+   and a compatible SQL mode.
 7. Run `php bin/check-platform.php` and `php bin/migrate.php` once from SSH or a
    protected deployment job. Back up and verify restore before migrations.
-8. Configure HostGator cron to invoke short-lived CLI PHP job batches. Use a
-   lock and reservation expiry; do not configure a permanent worker daemon.
+8. Configure HostGator cron to invoke short-lived CLI PHP job batches. When the
+   Podcast plugin is enabled, run `php bin/refresh-podcast-feeds.php` every
+   minute; per-feed due times and database locks prevent unnecessary work. Do
+   not configure a permanent worker daemon.
 9. Force HTTPS, verify rewrite/security headers, and enable HSTS only after all
    subdomains are confirmed HTTPS-safe. Test login, logout, CSRF, API origins,
    private media, plugin route gating, 404s, and production-safe errors.

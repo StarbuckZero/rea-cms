@@ -28,6 +28,8 @@ use ReaCms\Plugin\PdoPluginMigrationRunner;
 use ReaCms\Plugin\PendingPackageStore;
 use ReaCms\Plugin\PluginLifecycle;
 use ReaCms\Plugin\PluginManagementController;
+use ReaCms\Podcast\PodcastController;
+use ReaCms\Podcast\PodcastControllerFactory;
 use ReaCms\Support\SystemClock;
 
 final class ApplicationFactory
@@ -47,6 +49,7 @@ final class ApplicationFactory
         );
         $api = static fn (): ApiController => ApiControllerFactory::create($environment);
         $blog = static fn (): BlogController => BlogControllerFactory::create($environment);
+        $podcast = static fn (): PodcastController => PodcastControllerFactory::create($environment, $projectRoot);
         $cms = static function () use ($environment, $views, $projectRoot): CmsController {
             $pdo = ConnectionFactory::create($environment);
             $prefix = $environment->get('DB_TABLE_PREFIX', 'rea_') ?? 'rea_';
@@ -143,6 +146,30 @@ final class ApplicationFactory
             static fn (Request $request, array $parameters): Response => $blog()->item(
                 $request,
                 (int) $parameters['id'],
+                $parameters['format'],
+            ),
+        );
+        $router->get(
+            '/api/v1/podcast.{format}',
+            static fn (Request $request, array $parameters): Response => $podcast()->collection(
+                $request,
+                $parameters['format'],
+            ),
+        );
+        $router->get(
+            '/api/v1/podcast/{feed}.{format}',
+            static fn (Request $request, array $parameters): Response => $podcast()->feed(
+                $request,
+                $parameters['feed'],
+                $parameters['format'],
+            ),
+        );
+        $router->get(
+            '/api/v1/podcast/{feed}/{episode}.{format}',
+            static fn (Request $request, array $parameters): Response => $podcast()->episode(
+                $request,
+                $parameters['feed'],
+                $parameters['episode'],
                 $parameters['format'],
             ),
         );
@@ -256,6 +283,41 @@ final class ApplicationFactory
         $router->get(
             '/media/{id}',
             static fn (Request $request, array $parameters): Response => $cms()->publicMedium(
+                (int) $parameters['id'],
+            ),
+        );
+        $router->get('/cms/podcast', static fn (Request $request): Response => $podcast()->index($request));
+        $router->get('/cms/podcast/new', static fn (Request $request): Response => $podcast()->form($request));
+        $router->post('/cms/podcast', static fn (Request $request): Response => $podcast()->save($request));
+        $router->post(
+            '/cms/podcast/settings',
+            static fn (Request $request): Response => $podcast()->settings($request),
+        );
+        $router->get(
+            '/cms/podcast/{id}/edit',
+            static fn (Request $request, array $parameters): Response => $podcast()->form(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/cms/podcast/{id}',
+            static fn (Request $request, array $parameters): Response => $podcast()->save(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/cms/podcast/{id}/refresh',
+            static fn (Request $request, array $parameters): Response => $podcast()->refresh(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/cms/podcast/{id}/delete',
+            static fn (Request $request, array $parameters): Response => $podcast()->delete(
+                $request,
                 (int) $parameters['id'],
             ),
         );

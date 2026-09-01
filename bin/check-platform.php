@@ -6,6 +6,8 @@ declare(strict_types=1);
 const MINIMUM_PHP_VERSION = '8.2.0';
 
 $requiredExtensions = [
+    'curl',
+    'dom',
     'fileinfo',
     'json',
     'mbstring',

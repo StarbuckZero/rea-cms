@@ -1,0 +1,4 @@
+{
+  "plugin.name": "Podcast Feeds",
+  "plugin.description": "Synchronize podcast RSS feeds into a fast local API cache."
+}
