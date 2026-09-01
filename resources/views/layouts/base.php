@@ -12,17 +12,21 @@ use ReaCms\Plugin\PluginNavigationItem;
 /** @var User|null $authenticatedUser */
 /** @var string|null $csrfToken */
 /** @var bool $canAccessAdmin */
+/** @var bool $canManagePlugins */
 /** @var list<PluginNavigationItem> $pluginNavigation */
+$canManagePlugins = $canManagePlugins ?? false;
 ?>
 <!doctype html>
-<html lang="en" data-theme="<?= $escape($theme) ?>">
+<html lang="en" data-theme="<?= $escape($theme) ?>"<?= $authenticatedUser === null
+    ? ''
+    : ' data-theme-account="true"' ?>>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
     <title><?= $escape($title) ?></title>
     <script src="/assets/theme.js?v=1"></script>
-    <link rel="stylesheet" href="/assets/app.css?v=4">
+    <link rel="stylesheet" href="/assets/app.css?v=5">
     <script src="/assets/htmx.min.js?v=4.0.0" defer></script>
     <script src="/assets/navigation.js?v=1" defer></script>
 </head>
@@ -30,7 +34,7 @@ use ReaCms\Plugin\PluginNavigationItem;
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <header class="border-b border-default bg-surface-raised">
         <div class="page-shell flex items-center justify-between gap-4 py-4">
-            <a class="text-lg font-semibold" href="/dashboard">Rea CMS</a>
+            <a class="text-lg font-semibold" href="/dashboard">REA CMS</a>
             <?php if ($authenticatedUser === null) : ?>
                 <a class="button-primary" href="/login">Login</a>
             <?php else : ?>
@@ -62,22 +66,15 @@ use ReaCms\Plugin\PluginNavigationItem;
                             <p class="text-sm text-secondary">Signed in as</p>
                             <p class="font-semibold"><?= $escape($authenticatedUser->displayName) ?></p>
                             <nav class="menu-navigation profile-navigation" aria-label="User navigation">
+                                <a href="/profile">User Profile</a>
                                 <a href="/dashboard">Dashboard</a>
                                 <?php if ($canAccessAdmin) : ?>
                                     <a href="/admin">Admin</a>
                                 <?php endif; ?>
+                                <?php if ($canManagePlugins) : ?>
+                                    <a href="/admin/plugins">Plugin Management</a>
+                                <?php endif; ?>
                             </nav>
-                            <details class="settings-menu">
-                                <summary>Settings</summary>
-                                <fieldset class="theme-picker" aria-label="Color theme">
-                                    <legend>Theme</legend>
-                                    <?php foreach (['system', 'light', 'dark', 'high-contrast'] as $choice) : ?>
-                                        <button type="button" data-theme-choice="<?= $escape($choice) ?>">
-                                            <?= $escape(ucwords(str_replace('-', ' ', $choice))) ?>
-                                        </button>
-                                    <?php endforeach; ?>
-                                </fieldset>
-                            </details>
                             <form class="profile-logout" method="post" action="/logout">
                                 <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">
                                 <button type="submit">Logout</button>

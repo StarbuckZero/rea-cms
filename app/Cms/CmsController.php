@@ -460,11 +460,13 @@ final class CmsController
     {
         return Response::html($this->views->render('layouts/base', [
             'title' => $title,
-            'theme' => ThemePreference::parse($request->cookie('rea_theme')),
+            'theme' => ThemePreference::parse($user->theme),
             'content' => $content,
             'authenticatedUser' => $user,
             'csrfToken' => $this->auth->csrf->token($this->auth->sessions->start($request)->token),
             'canAccessAdmin' => $this->auth->authorization->allows($user->id, 'core.admin.access'),
+            'canManagePlugins' => $this->auth->authorization->allows($user->id, 'core.admin.access')
+                && $this->auth->authorization->allows($user->id, 'core.plugins.view'),
             'pluginNavigation' => (new PluginNavigation(
                 $this->auth->plugins,
                 $this->auth->pluginAccess,

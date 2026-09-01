@@ -39,7 +39,7 @@ final class PdoUserRepository implements UserRepository
     public function all(): array
     {
         $statement = $this->pdo->prepare(sprintf(
-            'SELECT users.id, users.email, users.password_hash, users.status, profiles.display_name '
+            'SELECT users.id, users.email, users.password_hash, users.status, profiles.display_name, profiles.theme '
                 . 'FROM `%s` AS users JOIN `%s` AS profiles ON profiles.user_id = users.id '
                 . 'WHERE users.deleted_at IS NULL ORDER BY users.email',
             $this->users,
@@ -100,6 +100,19 @@ final class PdoUserRepository implements UserRepository
         $statement->execute(['password_hash' => $passwordHash, 'user_id' => $userId]);
     }
 
+    public function updateProfile(int $userId, string $displayName, string $theme): void
+    {
+        $statement = $this->pdo->prepare(sprintf(
+            'UPDATE `%s` SET display_name = :display_name, theme = :theme WHERE user_id = :user_id',
+            $this->profiles,
+        ));
+        $statement->execute([
+            'display_name' => trim($displayName),
+            'theme' => $theme,
+            'user_id' => $userId,
+        ]);
+    }
+
     public function update(int $userId, string $email, string $displayName, string $status): void
     {
         $this->pdo->beginTransaction();
@@ -155,7 +168,7 @@ final class PdoUserRepository implements UserRepository
     private function find(string $condition, string|int $value): ?User
     {
         $statement = $this->pdo->prepare(sprintf(
-            'SELECT users.id, users.email, users.password_hash, users.status, profiles.display_name '
+            'SELECT users.id, users.email, users.password_hash, users.status, profiles.display_name, profiles.theme '
                 . 'FROM `%s` AS users JOIN `%s` AS profiles ON profiles.user_id = users.id '
                 . 'WHERE %s LIMIT 1',
             $this->users,
@@ -181,6 +194,7 @@ final class PdoUserRepository implements UserRepository
             (string) $row['password_hash'],
             (string) $row['status'],
             (string) $row['display_name'],
+            (string) $row['theme'],
         );
     }
 }

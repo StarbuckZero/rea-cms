@@ -350,11 +350,13 @@ Example manifest:
 
 ```json
 {
+  "schemaVersion": 1,
   "id": "blog",
   "name": "Blog",
   "version": "1.0.0",
   "reaCmsVersion": "^1.0",
   "description": "Blog publishing for Rea CMS.",
+  "author": "Rea CMS",
   "tables": [
     "plugin_blog_posts",
     "plugin_blog_categories",

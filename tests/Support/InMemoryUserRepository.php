@@ -56,6 +56,20 @@ final class InMemoryUserRepository implements UserRepository
             $passwordHash,
             $user->status,
             $user->displayName,
+            $user->theme,
+        );
+    }
+
+    public function updateProfile(int $userId, string $displayName, string $theme): void
+    {
+        $user = $this->users[$userId];
+        $this->users[$userId] = new User(
+            $user->id,
+            $user->email,
+            $user->passwordHash,
+            $user->status,
+            trim($displayName),
+            $theme,
         );
     }
 
@@ -63,7 +77,14 @@ final class InMemoryUserRepository implements UserRepository
     {
         $existing = $this->users[$userId] ?? null;
         if ($existing !== null) {
-            $this->users[$userId] = new User($userId, $email, $existing->passwordHash, $status, $displayName);
+            $this->users[$userId] = new User(
+                $userId,
+                $email,
+                $existing->passwordHash,
+                $status,
+                $displayName,
+                $existing->theme,
+            );
         }
     }
 

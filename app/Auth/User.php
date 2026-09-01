@@ -12,6 +12,7 @@ final class User
         public readonly string $passwordHash,
         public readonly string $status,
         public readonly string $displayName,
+        public readonly string $theme = 'system',
     ) {
     }
 

@@ -57,7 +57,36 @@ final class PackageInspectorTest extends TestCase
         yield 'php extension' => ['notes/run.php', '<?php echo 1;'];
         yield 'server control' => ['notes/.htaccess', 'Require all granted'];
         yield 'shell polyglot' => ['notes/assets/readme.txt', "#!/bin/sh\nid\n"];
+        yield 'late php marker' => ['notes/assets/readme.txt', str_repeat('A', 300) . '<?php echo 1;'];
         yield 'multiple roots' => ['other/file.json', '{}'];
+    }
+
+    public function testInvalidDeclarativeMigrationIsRejectedBeforeInstallation(): void
+    {
+        $archive = $this->archive([
+            'notes/plugin.json' => $this->manifest(),
+            'notes/migrations/001_install.json' => json_encode([
+                'operations' => [[
+                    'action' => 'create_table',
+                    'table' => 'plugin_other_entries',
+                    'columns' => [['name' => 'id', 'type' => 'bigint']],
+                ]],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->expectException(PluginException::class);
+        (new PackageInspector(new ManifestValidator()))->inspect($archive, $this->temporaryDirectory());
+    }
+
+    public function testUnsupportedTemplateSyntaxIsRejectedBeforeInstallation(): void
+    {
+        $archive = $this->archive([
+            'notes/plugin.json' => $this->manifest(),
+            'notes/templates/public/card.html' => '{{ arbitrary_function(note.title) }}',
+        ]);
+
+        $this->expectException(PluginException::class);
+        (new PackageInspector(new ManifestValidator()))->inspect($archive, $this->temporaryDirectory());
     }
 
     public function testExpansionLimitRejectsBombLikeEntry(): void

@@ -161,8 +161,9 @@ final class AuthControllerTest extends TestCase
         self::assertStringContainsString('class="navigation-menu plugins-menu"', $response->body());
         self::assertStringContainsString('class="navigation-menu profile-menu"', $response->body());
         self::assertStringContainsString('<span class="profile-name">User</span>', $response->body());
-        self::assertStringContainsString('<summary>Settings</summary>', $response->body());
-        self::assertStringContainsString('data-theme-choice="dark"', $response->body());
+        self::assertStringContainsString('href="/profile">User Profile</a>', $response->body());
+        self::assertStringNotContainsString('<summary>Settings</summary>', $response->body());
+        self::assertStringNotContainsString('data-theme-choice=', $response->body());
         self::assertStringContainsString('href="/dashboard">Dashboard</a>', $response->body());
         self::assertStringContainsString('href="/admin">Admin</a>', $response->body());
         self::assertStringContainsString('>Logout</button>', $response->body());
@@ -220,8 +221,9 @@ final class AuthControllerTest extends TestCase
 
         $profileMenu = substr($body, $profileStart);
         self::assertStringNotContainsString('/cms/blog', $profileMenu);
+        self::assertStringContainsString('href="/profile">User Profile</a>', $profileMenu);
         self::assertStringContainsString('href="/dashboard"', $profileMenu);
-        self::assertStringContainsString('<summary>Settings</summary>', $profileMenu);
+        self::assertStringNotContainsString('<summary>Settings</summary>', $profileMenu);
         self::assertStringContainsString('>Logout</button>', $profileMenu);
         self::assertSame(2, substr_count($body, 'name="main-navigation" data-navigation-menu'));
         self::assertStringContainsString('/assets/navigation.js?v=1', $body);
@@ -260,6 +262,79 @@ final class AuthControllerTest extends TestCase
         self::assertStringNotContainsString('Image galleries.', $response->body());
     }
 
+    public function testProfileRequiresAuthenticationAndPrepopulatesAccountSettings(): void
+    {
+        self::assertSame('/login', $this->controller->profile(new Request('GET', '/profile'))->header('Location'));
+
+        $this->users->users[1] = new User(1, 'user@example.com', 'hash', 'active', 'Current Name', 'dark');
+        $request = $this->authenticatedRequest('GET', '/profile');
+        $response = $this->controller->profile($request);
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('<html lang="en" data-theme="dark"', $response->body());
+        self::assertStringContainsString('value="user@example.com"', $response->body());
+        self::assertStringContainsString('value="Current Name"', $response->body());
+        self::assertStringContainsString('<option value="dark" selected>', $response->body());
+        self::assertStringContainsString('name="current_password"', $response->body());
+    }
+
+    public function testProfileUpdateValidatesAndPersistsTheDisplayNameAndTheme(): void
+    {
+        $this->users->users[1] = new User(1, 'user@example.com', 'hash', 'active', 'Old Name', 'system');
+        $request = $this->authenticatedRequest('POST', '/profile', [
+            'display_name' => 'Updated Name',
+            'theme' => 'high-contrast',
+        ]);
+        $response = $this->controller->updateProfile($request);
+
+        self::assertSame(303, $response->status());
+        self::assertSame('/profile?saved=profile', $response->header('Location'));
+        self::assertSame('Updated Name', $this->users->users[1]->displayName);
+        self::assertSame('high-contrast', $this->users->users[1]->theme);
+        self::assertSame('profile.updated', $this->audit->events[0]['event']);
+
+        $invalid = $this->authenticatedRequest('POST', '/profile', [
+            'display_name' => '',
+            'theme' => 'dark',
+        ]);
+        $invalidResponse = $this->controller->updateProfile($invalid);
+        self::assertSame(422, $invalidResponse->status());
+        self::assertStringContainsString('Enter a display name', $invalidResponse->body());
+    }
+
+    public function testPasswordChangeRequiresTheCurrentPasswordAndUpdatesTheHash(): void
+    {
+        $oldPassword = 'old password value';
+        $newPassword = 'a newly chosen password';
+        $this->users->users[1] = new User(
+            1,
+            'user@example.com',
+            $this->passwords->hash($oldPassword),
+            'active',
+            'User',
+        );
+        $wrong = $this->authenticatedRequest('POST', '/profile/password', [
+            'current_password' => 'incorrect password',
+            'new_password' => $newPassword,
+            'password_confirmation' => $newPassword,
+        ]);
+        $wrongResponse = $this->controller->updateProfilePassword($wrong);
+        self::assertSame(422, $wrongResponse->status());
+        self::assertStringContainsString('current password is incorrect', strtolower($wrongResponse->body()));
+        self::assertTrue($this->passwords->verify($oldPassword, $this->users->users[1]->passwordHash));
+
+        $valid = $this->authenticatedRequest('POST', '/profile/password', [
+            'current_password' => $oldPassword,
+            'new_password' => $newPassword,
+            'password_confirmation' => $newPassword,
+        ]);
+        $response = $this->controller->updateProfilePassword($valid);
+        self::assertSame(303, $response->status());
+        self::assertSame('/profile?saved=password', $response->header('Location'));
+        self::assertTrue($this->passwords->verify($newPassword, $this->users->users[1]->passwordHash));
+        self::assertSame('profile.password_changed', $this->audit->events[1]['event']);
+    }
+
     public function testLogoutClearsAuthenticatedNavigationState(): void
     {
         $this->users->users[1] = new User(1, 'user@example.com', 'hash', 'active', 'User');
@@ -289,5 +364,23 @@ final class AuthControllerTest extends TestCase
         self::assertTrue($this->authorization->allows(1, 'blog.posts.update'));
         self::assertFalse($this->authorization->allows(1, 'blog.posts.delete'));
         self::assertFalse($this->authorization->allows(2, 'blog.posts.update'));
+    }
+
+    /** @param array<string, string> $form */
+    private function authenticatedRequest(string $method, string $path, array $form = []): Request
+    {
+        $anonymous = $this->sessions->start(new Request('GET', '/login'));
+        $authenticated = $this->sessions->rotate(new Request('POST', '/login'), $anonymous, 1);
+        if ($method === 'POST') {
+            $form['_csrf'] = $this->csrf->token($authenticated->token);
+        }
+
+        return new Request(
+            $method,
+            $path,
+            ['cookie' => 'rea_session=' . $authenticated->token],
+            [],
+            http_build_query($form),
+        );
     }
 }

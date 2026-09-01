@@ -9,7 +9,7 @@ use JsonException;
 final class ManifestValidator
 {
     private const KEYS = [
-        'schemaVersion', 'id', 'name', 'version', 'reaCmsVersion', 'description',
+        'schemaVersion', 'id', 'name', 'version', 'reaCmsVersion', 'description', 'author',
         'tables', 'permissions', 'api', 'navigation',
     ];
 
@@ -39,6 +39,7 @@ final class ManifestValidator
         $version = $this->requiredString($data, 'version', 32);
         $compatibility = $this->requiredString($data, 'reaCmsVersion', 32);
         $description = $this->requiredString($data, 'description', 1000, true);
+        $author = isset($data['author']) ? $this->requiredString($data, 'author', 191) : '';
         if (($data['schemaVersion'] ?? null) !== 1 || preg_match('/^[a-z][a-z0-9_]{1,31}$/D', $id) !== 1) {
             throw new PluginException('The manifest schema version or plugin ID is invalid.');
         }
@@ -70,10 +71,26 @@ final class ManifestValidator
                 !is_array($navigation) || array_is_list($navigation)
                 || array_diff(array_keys($navigation), ['label', 'path']) !== []
                 || !is_string($navigation['label'] ?? null)
+                || trim($navigation['label']) === '' || strlen($navigation['label']) > 64
                 || !is_string($navigation['path'] ?? null)
                 || preg_match('#^/cms/[a-z][a-z0-9_-]{1,31}$#D', $navigation['path']) !== 1
             ) {
                 throw new PluginException('The plugin navigation metadata is invalid.');
+            }
+        }
+        if (isset($data['api'])) {
+            $api = $data['api'];
+            $formats = is_array($api) ? ($api['formats'] ?? null) : null;
+            if (
+                !is_array($api) || array_is_list($api)
+                || array_diff(array_keys($api), ['resource', 'formats', 'defaultPolicy']) !== []
+                || !is_string($api['resource'] ?? null)
+                || preg_match('/^[a-z][a-z0-9_-]{1,31}$/D', $api['resource']) !== 1
+                || !$this->validApiFormats($formats)
+                || !is_string($api['defaultPolicy'] ?? null)
+                || !in_array($api['defaultPolicy'], ['public', 'same-origin', 'authenticated'], true)
+            ) {
+                throw new PluginException('The plugin API metadata is invalid.');
             }
         }
 
@@ -83,6 +100,7 @@ final class ManifestValidator
             $version,
             $compatibility,
             $description,
+            $author,
             $tables,
             $permissions,
             $data,
@@ -118,5 +136,18 @@ final class ManifestValidator
             throw new PluginException('The manifest field ' . $key . ' contains duplicates.');
         }
         return $values;
+    }
+
+    private function validApiFormats(mixed $formats): bool
+    {
+        if (!is_array($formats) || !array_is_list($formats) || $formats === []) {
+            return false;
+        }
+        foreach ($formats as $format) {
+            if (!is_string($format) || !in_array($format, ['json', 'html', 'txt'], true)) {
+                return false;
+            }
+        }
+        return count(array_unique($formats)) === count($formats);
     }
 }

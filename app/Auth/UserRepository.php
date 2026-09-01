@@ -17,6 +17,8 @@ interface UserRepository
 
     public function updatePassword(int $userId, string $passwordHash): void;
 
+    public function updateProfile(int $userId, string $displayName, string $theme): void;
+
     public function update(int $userId, string $email, string $displayName, string $status): void;
 
     public function delete(int $userId): void;

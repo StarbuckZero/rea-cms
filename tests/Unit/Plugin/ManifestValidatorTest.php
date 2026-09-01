@@ -19,6 +19,7 @@ final class ManifestValidatorTest extends TestCase
         self::assertSame('notes', $manifest->id);
         self::assertSame(['plugin_notes_entries'], $manifest->tables);
         self::assertSame(['notes.entries.view'], $manifest->permissions);
+        self::assertSame('Example Author', $manifest->author);
         self::assertSame(hash('sha256', $json), $manifest->hash);
     }
 
@@ -42,6 +43,17 @@ final class ManifestValidatorTest extends TestCase
         yield 'permission namespace escape' => [['permissions' => ['core.users.manage']]];
         yield 'incompatible major version' => [['reaCmsVersion' => '^2.0']];
         yield 'invalid semantic version' => [['version' => 'latest']];
+        yield 'unknown API capability' => [['api' => [
+            'resource' => 'notes',
+            'formats' => ['json'],
+            'defaultPolicy' => 'same-origin',
+            'controller' => 'ArbitraryCode',
+        ]]];
+        yield 'invalid nested API format' => [['api' => [
+            'resource' => 'notes',
+            'formats' => [['php']],
+            'defaultPolicy' => 'same-origin',
+        ]]];
     }
 
     private function manifest(): string
@@ -53,6 +65,7 @@ final class ManifestValidatorTest extends TestCase
             'version' => '1.0.0',
             'reaCmsVersion' => '^1.0',
             'description' => 'Declarative notes.',
+            'author' => 'Example Author',
             'tables' => ['plugin_notes_entries'],
             'permissions' => ['notes.entries.view'],
         ], JSON_THROW_ON_ERROR);

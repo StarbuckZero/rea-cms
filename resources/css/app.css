@@ -277,6 +277,22 @@
     grid-column: 1 / -1;
   }
 
+  .profile-settings-grid {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .form-help {
+    color: var(--rea-text-secondary);
+    font-size: 0.875rem;
+  }
+
+  @media (min-width: 56rem) {
+    .profile-settings-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   .widget-heading,
   .plugin-card-heading {
     align-items: center;
@@ -356,6 +372,52 @@
     justify-content: center;
     min-height: 2.75rem;
     padding-inline: 1rem;
+  }
+
+  .button-danger {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-transparent px-4 font-bold;
+    background: var(--rea-status-danger);
+    color: var(--rea-surface);
+  }
+
+  .plugin-management-heading {
+    @apply flex flex-wrap items-center justify-between gap-4;
+  }
+
+  .plugin-management-card {
+    @apply flex flex-col;
+  }
+
+  .plugin-metadata {
+    @apply grid gap-3;
+  }
+
+  .plugin-metadata > div {
+    @apply grid gap-1;
+    grid-template-columns: minmax(8rem, 0.4fr) minmax(0, 1fr);
+  }
+
+  .plugin-metadata dt {
+    @apply font-semibold;
+  }
+
+  .plugin-metadata dd {
+    color: var(--rea-text-secondary);
+  }
+
+  .danger-panel {
+    border-color: var(--rea-status-danger);
+  }
+
+  .status-disabled,
+  .status-uninstalled,
+  .status-maintenance {
+    border-color: var(--rea-status-warning);
+    color: var(--rea-status-warning);
+  }
+
+  .break-value {
+    overflow-wrap: anywhere;
   }
 
   .button-primary {

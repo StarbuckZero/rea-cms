@@ -11,6 +11,9 @@ interface PluginRegistry
     /** @return list<PluginRecord> */
     public function active(): array;
 
+    /** @return list<PluginRecord> */
+    public function all(): array;
+
     public function install(StagedPackage $package): void;
 
     public function update(StagedPackage $package): void;

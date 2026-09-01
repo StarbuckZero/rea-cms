@@ -34,9 +34,14 @@ final class PluginLifecycle
         if (file_exists($destination) || !rename($package->directory, $destination)) {
             throw new PluginException('The staged plugin could not be atomically installed.');
         }
+        $installedPackage = new StagedPackage(
+            $package->manifest,
+            $destination,
+            $package->packageHash,
+        );
         try {
-            $this->registry->install($package);
-            ($this->migrate)($package);
+            $this->registry->install($installedPackage);
+            ($this->migrate)($installedPackage);
             $this->clearCaches();
         } catch (Throwable $exception) {
             $this->registry->remove($package->manifest->id);
@@ -84,7 +89,10 @@ final class PluginLifecycle
 
     public function enable(string $pluginId, int $actorId, string $ip, string $requestId): void
     {
-        $this->requireInstalled($pluginId);
+        $record = $this->requireInstalled($pluginId);
+        if ($record->state !== 'disabled') {
+            throw new PluginException('Only a disabled plugin can be enabled.');
+        }
         if (!is_dir($this->path($pluginId))) {
             throw new PluginException('Plugin files are missing.');
         }
@@ -95,7 +103,10 @@ final class PluginLifecycle
 
     public function disable(string $pluginId, int $actorId, string $ip, string $requestId): void
     {
-        $this->requireInstalled($pluginId);
+        $record = $this->requireInstalled($pluginId);
+        if ($record->state !== 'enabled') {
+            throw new PluginException('Only an enabled plugin can be disabled.');
+        }
         $this->registry->setState($pluginId, 'disabled');
         $this->clearCaches();
         $this->record('plugin.disabled', $pluginId, $actorId, $ip, $requestId);

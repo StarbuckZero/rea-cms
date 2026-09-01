@@ -16,11 +16,17 @@ use ReaCms\Plugin\PluginRecord;
 /** @var list<User> $users */
 /** @var list<PluginRecord> $plugins */
 /** @var PluginAccess $pluginAccess */
+/** @var bool $canManagePlugins */
 ?>
 <section aria-labelledby="admin-heading">
     <p class="eyebrow">Administration</p>
     <h1 id="admin-heading" class="mt-3 text-3xl font-bold">Welcome, <?= $escape($user->displayName) ?></h1>
     <p class="mt-4 text-secondary">Signed in as <?= $escape($user->email) ?></p>
+    <?php if ($canManagePlugins) : ?>
+        <div class="button-row mt-6">
+            <a class="button-secondary" href="/admin/plugins">Plugin Management</a>
+        </div>
+    <?php endif; ?>
 
     <div class="mt-10 grid gap-6 md:grid-cols-2">
         <section class="panel" aria-labelledby="session-heading">

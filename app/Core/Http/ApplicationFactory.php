@@ -7,6 +7,7 @@ namespace ReaCms\Core\Http;
 use ReaCms\Api\ApiController;
 use ReaCms\Api\ApiControllerFactory;
 use ReaCms\Api\Policy\OriginAllowlist;
+use ReaCms\Api\RateLimit\PdoRateLimiter;
 use ReaCms\Auth\AuthController;
 use ReaCms\Auth\AuthServicesFactory;
 use ReaCms\Blog\BlogController;
@@ -20,6 +21,14 @@ use ReaCms\Core\Routing\Router;
 use ReaCms\Core\Theme\ThemePreference;
 use ReaCms\Core\View\ViewRenderer;
 use ReaCms\Database\ConnectionFactory;
+use ReaCms\Plugin\ManifestValidator;
+use ReaCms\Plugin\PackageInspector;
+use ReaCms\Plugin\PdoPluginDataManager;
+use ReaCms\Plugin\PdoPluginMigrationRunner;
+use ReaCms\Plugin\PendingPackageStore;
+use ReaCms\Plugin\PluginLifecycle;
+use ReaCms\Plugin\PluginManagementController;
+use ReaCms\Support\SystemClock;
 
 final class ApplicationFactory
 {
@@ -56,6 +65,35 @@ final class ApplicationFactory
                 ]))),
             );
         };
+        $pluginManagement = static function () use (
+            $environment,
+            $views,
+            $projectRoot,
+        ): PluginManagementController {
+            $pdo = ConnectionFactory::create($environment);
+            $prefix = $environment->get('DB_TABLE_PREFIX', 'rea_') ?? 'rea_';
+            $services = AuthServicesFactory::create($environment);
+            $validator = new ManifestValidator($environment->get('APP_VERSION', '1.0.0') ?? '1.0.0');
+            $staging = $projectRoot . '/storage/plugins/staging';
+            return new PluginManagementController(
+                $services,
+                $views,
+                new PackageInspector($validator),
+                new PendingPackageStore($staging, $validator),
+                new PluginLifecycle(
+                    $services->plugins,
+                    $services->audit,
+                    $projectRoot . '/plugins',
+                    $projectRoot . '/storage/backups/plugins/files',
+                    $projectRoot . '/storage/cache',
+                    (new PdoPluginMigrationRunner($pdo, prefix: $prefix))->apply(...),
+                ),
+                new PdoPluginDataManager($pdo, $projectRoot . '/storage/backups/plugins/data', $prefix),
+                new PdoRateLimiter($pdo, $prefix),
+                new SystemClock(),
+                $staging,
+            );
+        };
 
         $router->get('/', static function (Request $request) use ($views): Response {
             $theme = ThemePreference::parse($request->cookie('rea_theme'));
@@ -68,6 +106,7 @@ final class ApplicationFactory
                 'authenticatedUser' => null,
                 'csrfToken' => null,
                 'canAccessAdmin' => false,
+                'canManagePlugins' => false,
                 'pluginNavigation' => [],
             ]));
         });
@@ -111,6 +150,12 @@ final class ApplicationFactory
         $router->post('/login', static fn (Request $request): Response => $auth()->login($request));
         $router->post('/logout', static fn (Request $request): Response => $auth()->logout($request));
         $router->get('/dashboard', static fn (Request $request): Response => $auth()->dashboard($request));
+        $router->get('/profile', static fn (Request $request): Response => $auth()->profile($request));
+        $router->post('/profile', static fn (Request $request): Response => $auth()->updateProfile($request));
+        $router->post(
+            '/profile/password',
+            static fn (Request $request): Response => $auth()->updateProfilePassword($request),
+        );
         $router->get('/cms/blog', static fn (Request $request): Response => $cms()->blogIndex($request));
         $router->get('/cms/blog/new', static fn (Request $request): Response => $cms()->blogForm($request));
         $router->post('/cms/blog', static fn (Request $request): Response => $cms()->saveBlog($request));
@@ -253,6 +298,53 @@ final class ApplicationFactory
             ),
         );
         $router->get('/admin', static fn (Request $request): Response => $auth()->admin($request));
+        $router->get(
+            '/admin/plugins',
+            static fn (Request $request): Response => $pluginManagement()->index($request),
+        );
+        $router->post(
+            '/admin/plugins/inspect',
+            static fn (Request $request): Response => $pluginManagement()->inspect($request),
+        );
+        $router->post(
+            '/admin/plugins/install',
+            static fn (Request $request): Response => $pluginManagement()->install($request),
+        );
+        $router->post(
+            '/admin/plugins/{id}/enable',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->enable(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/admin/plugins/{id}/disable',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->disable(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->get(
+            '/admin/plugins/{id}/remove',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->removal(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/admin/plugins/{id}/backup',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->backup(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/admin/plugins/{id}/uninstall',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->uninstall(
+                $request,
+                $parameters['id'],
+            ),
+        );
         $router->post('/admin/users', static fn (Request $request): Response => $auth()->createUser($request));
         $router->post(
             '/admin/users/{id}',

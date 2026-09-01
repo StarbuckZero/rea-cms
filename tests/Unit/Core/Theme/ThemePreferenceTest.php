@@ -37,4 +37,12 @@ final class ThemePreferenceTest extends TestCase
         self::assertSame('system', ThemePreference::parse(null));
         self::assertSame('system', ThemePreference::parse('unknown'));
     }
+
+    public function testItExposesAndValidatesTheSupportedAccountChoices(): void
+    {
+        self::assertSame(['system', 'light', 'dark', 'high-contrast'], ThemePreference::choices());
+        self::assertTrue(ThemePreference::accepts(' DARK '));
+        self::assertFalse(ThemePreference::accepts('unknown'));
+        self::assertFalse(ThemePreference::accepts(null));
+    }
 }

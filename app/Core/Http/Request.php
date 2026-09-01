@@ -9,6 +9,7 @@ final class Request
     /**
      * @param array<string, string> $headers
      * @param array<string, string|list<string>> $query
+     * @param array<string, UploadedFile> $files
      */
     public function __construct(
         private readonly string $method,
@@ -18,6 +19,7 @@ final class Request
         private readonly string $body = '',
         private readonly string $clientIp = '127.0.0.1',
         private readonly ?string $requestId = null,
+        private readonly array $files = [],
     ) {
     }
 
@@ -60,7 +62,31 @@ final class Request
             $trustedProxies,
         );
 
-        return new self($method, $uri, $headers, $query, $body === false ? '' : $body, $clientIp);
+        $files = [];
+        foreach ($_FILES as $key => $file) {
+            if (
+                is_string($key) && is_array($file)
+                && is_string($file['name'] ?? null) && is_string($file['tmp_name'] ?? null)
+                && is_int($file['error'] ?? null) && is_int($file['size'] ?? null)
+            ) {
+                $files[$key] = new UploadedFile(
+                    $file['name'],
+                    $file['tmp_name'],
+                    $file['error'],
+                    $file['size'],
+                );
+            }
+        }
+
+        return new self(
+            $method,
+            $uri,
+            $headers,
+            $query,
+            $body === false ? '' : $body,
+            $clientIp,
+            files: $files,
+        );
     }
 
     public function method(): string
@@ -124,6 +150,11 @@ final class Request
         return $this->clientIp;
     }
 
+    public function file(string $name): ?UploadedFile
+    {
+        return $this->files[$name] ?? null;
+    }
+
     public function userAgent(): string
     {
         return $this->header('user-agent') ?? '';
@@ -144,6 +175,7 @@ final class Request
             $this->body,
             $this->clientIp,
             $requestId,
+            $this->files,
         );
     }
 

@@ -6,6 +6,7 @@ namespace ReaCms\Plugin;
 
 use JsonException;
 use PDO;
+use PDOStatement;
 use RuntimeException;
 
 final class PdoPluginRegistry implements PluginRegistry
@@ -49,6 +50,25 @@ final class PdoPluginRegistry implements PluginRegistry
             }
         }
 
+        return $records;
+    }
+
+    /** @return list<PluginRecord> */
+    public function all(): array
+    {
+        $statement = $this->pdo->query(sprintf(
+            'SELECT plugin_id, name, version, state, package_hash, manifest_json FROM `%s` ORDER BY name, plugin_id',
+            $this->table,
+        ));
+        if (!$statement instanceof PDOStatement) {
+            throw new PluginException('The installed plugin list could not be read.');
+        }
+        $records = [];
+        foreach ($statement->fetchAll() as $row) {
+            if (is_array($row)) {
+                $records[] = $this->record($row);
+            }
+        }
         return $records;
     }
 
@@ -136,6 +156,11 @@ final class PdoPluginRegistry implements PluginRegistry
             is_array($manifest) && is_string($manifest['navigation']['path'] ?? null)
                 ? $manifest['navigation']['path']
                 : null,
+            is_array($manifest) && is_string($manifest['author'] ?? null) ? $manifest['author'] : '',
+            is_array($manifest) && is_array($manifest['tables'] ?? null)
+                ? array_values(array_filter($manifest['tables'], 'is_string'))
+                : [],
+            is_array($manifest) ? $manifest : [],
         );
     }
 }

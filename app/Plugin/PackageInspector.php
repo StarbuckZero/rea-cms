@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace ReaCms\Plugin;
 
 use finfo;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
+use Throwable;
 use ZipArchive;
 
 final class PackageInspector
@@ -16,6 +20,8 @@ final class PackageInspector
 
     public function __construct(
         private readonly ManifestValidator $manifests,
+        private readonly DeclarativeMigration $migrations = new DeclarativeMigration(),
+        private readonly SafeTemplate $templates = new SafeTemplate(),
         private readonly int $maximumCompressedBytes = 10_000_000,
         private readonly int $maximumExtractedBytes = 50_000_000,
         private readonly int $maximumFileBytes = 5_000_000,
@@ -43,6 +49,7 @@ final class PackageInspector
             throw new PluginException('The plugin ZIP could not be opened.');
         }
 
+        $stage = null;
         try {
             [$root, $entries] = $this->validateEntries($zip);
             $manifestIndex = $entries[$root . '/plugin.json'] ?? null;
@@ -63,6 +70,7 @@ final class PackageInspector
                 throw new PluginException('A private staging directory could not be created.');
             }
             $this->extractValidated($zip, $entries, $root, $stage);
+            $this->validateDeclarativeFiles($manifest, $stage . '/' . $root);
 
             $packageHash = hash_file('sha256', $archivePath);
             if ($packageHash === false) {
@@ -70,6 +78,11 @@ final class PackageInspector
             }
 
             return new StagedPackage($manifest, $stage . '/' . $root, $packageHash);
+        } catch (Throwable $exception) {
+            if (is_string($stage) && is_dir($stage)) {
+                $this->removeDirectory($stage);
+            }
+            throw $exception;
         } finally {
             $zip->close();
         }
@@ -82,6 +95,7 @@ final class PackageInspector
             throw new PluginException('The package file-count limit was exceeded.');
         }
         $entries = [];
+        $seen = [];
         $roots = [];
         $total = 0;
         for ($index = 0; $index < $zip->numFiles; $index++) {
@@ -92,9 +106,10 @@ final class PackageInspector
             $name = str_replace('\\', '/', $stat['name']);
             $this->validatePath($name);
             $normalized = rtrim($name, '/');
-            if (isset($entries[$normalized])) {
+            if (isset($seen[$normalized])) {
                 throw new PluginException('The package contains duplicate normalized paths.');
             }
+            $seen[$normalized] = true;
             $roots[explode('/', $normalized)[0]] = true;
             $depth = substr_count($normalized, '/');
             if ($depth > $this->maximumDepth) {
@@ -147,16 +162,16 @@ final class PackageInspector
         }
         $attributes = 0;
         $operations = 0;
-        if (
-            $zip->getExternalAttributesIndex($index, $operations, $attributes)
-            && (($attributes >> 16) & 0170000) === 0120000
-        ) {
-            throw new PluginException('Symbolic links are forbidden in plugin packages.');
+        if ($zip->getExternalAttributesIndex($index, $operations, $attributes)) {
+            $type = ($attributes >> 16) & 0170000;
+            if ($type !== 0 && $type !== 0100000) {
+                throw new PluginException('Links and special files are forbidden in plugin packages.');
+            }
         }
-        $prefix = $zip->getFromIndex($index, 256);
+        $contents = $zip->getFromIndex($index);
         if (
-            !is_string($prefix) || str_contains(strtolower($prefix), '<?php')
-            || str_starts_with($prefix, "#!")
+            !is_string($contents) || str_contains(strtolower($contents), '<?php')
+            || str_starts_with($contents, "#!")
         ) {
             throw new PluginException('The package contains executable or unreadable content.');
         }
@@ -183,5 +198,52 @@ final class PackageInspector
     private function isDirectory(string $name): bool
     {
         return str_ends_with($name, '/');
+    }
+
+    private function validateDeclarativeFiles(Manifest $manifest, string $directory): void
+    {
+        $migrationFiles = glob($directory . '/migrations/*.json') ?: [];
+        sort($migrationFiles, SORT_STRING);
+        foreach ($migrationFiles as $file) {
+            if (preg_match('/^[0-9]{3}_[a-z0-9_]+\.json$/D', basename($file)) !== 1) {
+                throw new PluginException('Plugin migration filenames must be ordered and normalized.');
+            }
+            $json = file_get_contents($file);
+            if (!is_string($json)) {
+                throw new PluginException('A plugin migration could not be read.');
+            }
+            $this->migrations->compile($manifest->id, $manifest, $json);
+        }
+
+        $templateDirectory = $directory . '/templates';
+        if (!is_dir($templateDirectory)) {
+            return;
+        }
+        $templateFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(
+            $templateDirectory,
+            RecursiveDirectoryIterator::SKIP_DOTS,
+        ));
+        foreach ($templateFiles as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile() || strtolower($file->getExtension()) !== 'html') {
+                continue;
+            }
+            $template = file_get_contents($file->getPathname());
+            if (!is_string($template)) {
+                throw new PluginException('A plugin template could not be read.');
+            }
+            $this->templates->render($template, []);
+        }
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        foreach (scandir($directory) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $path = $directory . '/' . $entry;
+            is_dir($path) ? $this->removeDirectory($path) : unlink($path);
+        }
+        rmdir($directory);
     }
 }

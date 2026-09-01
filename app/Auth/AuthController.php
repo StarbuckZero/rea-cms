@@ -106,6 +106,116 @@ final class AuthController
         );
     }
 
+    public function profile(Request $request): Response
+    {
+        [$session, $user] = $this->authenticated($request);
+        if ($user === null) {
+            return $this->services->sessions->withCookie(Response::redirect('/login'), $session);
+        }
+
+        return $this->renderProfile($request, $session, $user);
+    }
+
+    public function updateProfile(Request $request): Response
+    {
+        [$session, $user] = $this->authenticated($request);
+        if ($user === null) {
+            return $this->services->sessions->withCookie(Response::redirect('/login'), $session);
+        }
+        $form = $request->form();
+        if (!$this->services->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $user, '/profile');
+        }
+
+        $displayName = trim($form['display_name'] ?? '');
+        $theme = $form['theme'] ?? null;
+        if (!$this->validDisplayName($displayName)) {
+            return $this->renderProfile(
+                $request,
+                $session,
+                $user,
+                profileError: 'Enter a display name between 1 and 191 characters without control characters.',
+                status: 422,
+            );
+        }
+        if (!ThemePreference::accepts($theme)) {
+            return $this->renderProfile(
+                $request,
+                $session,
+                $user,
+                profileError: 'Choose one of the available themes.',
+                status: 422,
+            );
+        }
+
+        $this->services->users->updateProfile($user->id, $displayName, ThemePreference::parse($theme));
+        $this->audit($request, 'profile.updated', $user->id, ['theme' => ThemePreference::parse($theme)]);
+
+        return $this->services->sessions->withCookie(Response::redirect('/profile?saved=profile'), $session);
+    }
+
+    public function updateProfilePassword(Request $request): Response
+    {
+        [$session, $user] = $this->authenticated($request);
+        if ($user === null) {
+            return $this->services->sessions->withCookie(Response::redirect('/login'), $session);
+        }
+        $form = $request->form();
+        if (!$this->services->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $user, '/profile/password');
+        }
+
+        $currentPassword = $form['current_password'] ?? '';
+        $newPassword = $form['new_password'] ?? '';
+        $confirmation = $form['password_confirmation'] ?? '';
+        if (strlen($newPassword) < 12) {
+            return $this->renderProfile(
+                $request,
+                $session,
+                $user,
+                passwordError: 'The new password must contain at least 12 characters.',
+                status: 422,
+            );
+        }
+        if (!hash_equals($newPassword, $confirmation)) {
+            return $this->renderProfile(
+                $request,
+                $session,
+                $user,
+                passwordError: 'The new password and confirmation do not match.',
+                status: 422,
+            );
+        }
+        if (hash_equals($currentPassword, $newPassword)) {
+            return $this->renderProfile(
+                $request,
+                $session,
+                $user,
+                passwordError: 'Choose a new password that is different from your current password.',
+                status: 422,
+            );
+        }
+
+        try {
+            $this->services->login->reauthenticate($user, $currentPassword);
+        } catch (RuntimeException) {
+            $this->audit($request, 'profile.password_change_failed', $user->id);
+            return $this->renderProfile(
+                $request,
+                $session,
+                $user,
+                passwordError: 'The current password is incorrect.',
+                status: 422,
+            );
+        }
+
+        $this->services->users->updatePassword($user->id, $this->services->login->hashPassword($newPassword));
+        $this->services->sessions->markReauthenticated($session);
+        $this->audit($request, 'profile.password_changed', $user->id);
+
+        return $this->services->sessions->withCookie(Response::redirect('/profile?saved=password'), $session);
+    }
+
     public function admin(Request $request): Response
     {
         [$session, $user] = $this->authenticated($request);
@@ -146,6 +256,7 @@ final class AuthController
                 'Shared images and files.',
             )],
             'pluginAccess' => $this->services->pluginAccess,
+            'canManagePlugins' => $this->services->authorization->allows($user->id, 'core.plugins.view'),
         ]);
 
         return $this->services->sessions->withCookie(
@@ -471,6 +582,41 @@ final class AuthController
         ), $session);
     }
 
+    private function renderProfile(
+        Request $request,
+        SessionContext $session,
+        User $user,
+        ?string $profileError = null,
+        ?string $passwordError = null,
+        int $status = 200,
+    ): Response {
+        $saved = $request->query()['saved'] ?? null;
+        $success = is_string($saved) ? match ($saved) {
+            'profile' => 'Your profile settings were saved.',
+            'password' => 'Your password was changed.',
+            default => null,
+        } : null;
+        $content = $this->views->render('auth/profile', [
+            'user' => $user,
+            'csrfToken' => $this->services->csrf->token($session->token),
+            'themes' => ThemePreference::choices(),
+            'success' => $success,
+            'profileError' => $profileError,
+            'passwordError' => $passwordError,
+        ]);
+
+        return $this->services->sessions->withCookie(
+            $this->renderPage($request, 'User Profile', $content, $status, $user),
+            $session,
+        );
+    }
+
+    private function validDisplayName(string $displayName): bool
+    {
+        $length = mb_strlen($displayName);
+        return $length >= 1 && $length <= 191 && preg_match('/[\x00-\x1F\x7F]/u', $displayName) !== 1;
+    }
+
     private function renderLogin(
         Request $request,
         string $csrfToken,
@@ -492,7 +638,9 @@ final class AuthController
     ): Response {
         return Response::html($this->views->render('layouts/base', [
             'title' => $title,
-            'theme' => ThemePreference::parse($request->cookie('rea_theme')),
+            'theme' => ThemePreference::parse(
+                $authenticatedUser === null ? $request->cookie('rea_theme') : $authenticatedUser->theme,
+            ),
             'content' => $content,
             'authenticatedUser' => $authenticatedUser,
             'csrfToken' => $authenticatedUser === null ? null : $this->services->csrf->token(
@@ -500,6 +648,9 @@ final class AuthController
             ),
             'canAccessAdmin' => $authenticatedUser !== null
                 && $this->services->authorization->allows($authenticatedUser->id, 'core.admin.access'),
+            'canManagePlugins' => $authenticatedUser !== null
+                && $this->services->authorization->allows($authenticatedUser->id, 'core.admin.access')
+                && $this->services->authorization->allows($authenticatedUser->id, 'core.plugins.view'),
             'pluginNavigation' => $authenticatedUser === null ? [] : (new PluginNavigation(
                 $this->services->plugins,
                 $this->services->pluginAccess,

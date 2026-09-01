@@ -17,6 +17,7 @@ final class Manifest
         public readonly string $version,
         public readonly string $reaCmsVersion,
         public readonly string $description,
+        public readonly string $author,
         public readonly array $tables,
         public readonly array $permissions,
         public readonly array $document,

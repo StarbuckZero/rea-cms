@@ -3,9 +3,13 @@
 
   const allowedThemes = new Set(["system", "light", "dark", "high-contrast"]);
   const storedTheme = window.localStorage.getItem("rea_theme");
-  const initialTheme = allowedThemes.has(storedTheme)
-    ? storedTheme
-    : document.documentElement.dataset.theme || "system";
+  const serverTheme = document.documentElement.dataset.theme || "system";
+  const hasAccountTheme = document.documentElement.dataset.themeAccount === "true";
+  const initialTheme = hasAccountTheme && allowedThemes.has(serverTheme)
+    ? serverTheme
+    : allowedThemes.has(storedTheme)
+      ? storedTheme
+      : serverTheme;
 
   const applyTheme = (theme) => {
     const selected = allowedThemes.has(theme) ? theme : "system";
@@ -15,6 +19,10 @@
 
     for (const button of document.querySelectorAll("[data-theme-choice]")) {
       button.setAttribute("aria-pressed", String(button.dataset.themeChoice === selected));
+    }
+
+    for (const select of document.querySelectorAll("[data-theme-select]")) {
+      select.value = selected;
     }
   };
 
@@ -28,6 +36,14 @@
 
       if (button) {
         applyTheme(button.dataset.themeChoice);
+      }
+    });
+
+    document.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-theme-select]");
+
+      if (select) {
+        applyTheme(select.value);
       }
     });
 

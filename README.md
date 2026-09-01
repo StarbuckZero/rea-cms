@@ -66,6 +66,7 @@ Local routes:
 - `/login` — administrator sign-in
 - `/forgot-password` — password reset request
 - `/admin` — authenticated and permission-protected administration
+- `/admin/plugins` — super-administrator plugin installation, lifecycle, backup, and removal
 - `/api/v1/status.json` — same-origin JSON API platform status
 - `/api/v1/status.html` — same-origin HTML API platform status
 - `/api/v1/status.txt` — same-origin plain-text API platform status

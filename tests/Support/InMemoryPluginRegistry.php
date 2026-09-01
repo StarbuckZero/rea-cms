@@ -28,6 +28,12 @@ final class InMemoryPluginRegistry implements PluginRegistry
         ));
     }
 
+    /** @return list<PluginRecord> */
+    public function all(): array
+    {
+        return array_values($this->records);
+    }
+
     public function install(StagedPackage $package): void
     {
         $this->records[$package->manifest->id] = new PluginRecord(
@@ -35,6 +41,17 @@ final class InMemoryPluginRegistry implements PluginRegistry
             $package->manifest->version,
             'disabled',
             $package->packageHash,
+            $package->manifest->name,
+            $package->manifest->description,
+            is_string($package->manifest->document['navigation']['label'] ?? null)
+                ? $package->manifest->document['navigation']['label']
+                : null,
+            is_string($package->manifest->document['navigation']['path'] ?? null)
+                ? $package->manifest->document['navigation']['path']
+                : null,
+            $package->manifest->author,
+            $package->manifest->tables,
+            $package->manifest->document,
         );
     }
 
@@ -49,13 +66,36 @@ final class InMemoryPluginRegistry implements PluginRegistry
             $package->manifest->version,
             $state,
             $package->packageHash,
+            $package->manifest->name,
+            $package->manifest->description,
+            is_string($package->manifest->document['navigation']['label'] ?? null)
+                ? $package->manifest->document['navigation']['label']
+                : null,
+            is_string($package->manifest->document['navigation']['path'] ?? null)
+                ? $package->manifest->document['navigation']['path']
+                : null,
+            $package->manifest->author,
+            $package->manifest->tables,
+            $package->manifest->document,
         );
     }
 
     public function setState(string $pluginId, string $state): void
     {
         $record = $this->records[$pluginId];
-        $this->records[$pluginId] = new PluginRecord($record->id, $record->version, $state, $record->packageHash);
+        $this->records[$pluginId] = new PluginRecord(
+            $record->id,
+            $record->version,
+            $state,
+            $record->packageHash,
+            $record->name,
+            $record->description,
+            $record->navigationLabel,
+            $record->navigationPath,
+            $record->author,
+            $record->tables,
+            $record->manifest,
+        );
     }
 
     public function remove(string $pluginId): void
