@@ -24,6 +24,15 @@
   "api": {
     "resource": "blog",
     "formats": ["json", "html", "txt"],
-    "defaultPolicy": "same-origin"
+    "defaultPolicy": "same-origin",
+    "fields": {
+      "id": {"type":"integer","label":"Post ID","description":"Unique numeric identifier for the blog post."},
+      "title": {"type":"string","label":"Title","description":"Published blog post title."},
+      "slug": {"type":"string","label":"Slug","description":"URL-safe blog post slug."},
+      "excerpt": {"type":"text","label":"Excerpt","description":"Short summary of the blog post."},
+      "content": {"type":"html","label":"Content","description":"Sanitized rich-text blog post content."},
+      "locale": {"type":"string","label":"Locale","description":"Content locale code."},
+      "publishedAt": {"type":"datetime","label":"Published date","description":"Publication timestamp in ISO 8601 format."}
+    }
   }
 }

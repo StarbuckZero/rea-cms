@@ -21,3 +21,15 @@ await copyFile(
   new URL("../resources/js/editor.js", import.meta.url),
   new URL("../public/assets/editor.js", import.meta.url),
 );
+await copyFile(
+  new URL("../resources/js/rich-text-editor.js", import.meta.url),
+  new URL("../public/assets/rich-text-editor.js", import.meta.url),
+);
+await copyFile(
+  new URL("../resources/js/api-template-editor.js", import.meta.url),
+  new URL("../public/assets/api-template-editor.js", import.meta.url),
+);
+await copyFile(
+  new URL("../resources/js/text-blocks.js", import.meta.url),
+  new URL("../public/assets/text-blocks.js", import.meta.url),
+);

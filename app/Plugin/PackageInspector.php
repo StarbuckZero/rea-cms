@@ -216,6 +216,24 @@ final class PackageInspector
         }
 
         $templateDirectory = $directory . '/templates';
+        $formats = is_array($manifest->document['api']['formats'] ?? null)
+            ? $manifest->document['api']['formats']
+            : [];
+        foreach (['html', 'txt'] as $format) {
+            if (!in_array($format, $formats, true)) {
+                continue;
+            }
+            foreach (['list', 'detail'] as $mode) {
+                if (!is_file($templateDirectory . '/api/' . $mode . '.' . $format)) {
+                    throw new PluginException(sprintf(
+                        'Plugins exposing %s APIs must define templates/api/%s.%s.',
+                        $format,
+                        $mode,
+                        $format,
+                    ));
+                }
+            }
+        }
         if (!is_dir($templateDirectory)) {
             return;
         }
@@ -224,14 +242,19 @@ final class PackageInspector
             RecursiveDirectoryIterator::SKIP_DOTS,
         ));
         foreach ($templateFiles as $file) {
-            if (!$file instanceof SplFileInfo || !$file->isFile() || strtolower($file->getExtension()) !== 'html') {
+            if (
+                !$file instanceof SplFileInfo || !$file->isFile()
+                || !in_array(strtolower($file->getExtension()), ['html', 'txt'], true)
+            ) {
                 continue;
             }
             $template = file_get_contents($file->getPathname());
             if (!is_string($template)) {
                 throw new PluginException('A plugin template could not be read.');
             }
-            $this->templates->render($template, []);
+            strtolower($file->getExtension()) === 'txt'
+                ? $this->templates->renderText($template, [])
+                : $this->templates->render($template, []);
         }
     }
 

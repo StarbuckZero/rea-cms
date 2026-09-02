@@ -8,7 +8,7 @@ use ReaCms\Auth\AuthServices;
 use ReaCms\Auth\SessionContext;
 use ReaCms\Auth\User;
 use ReaCms\Api\Policy\OriginAllowlist;
-use ReaCms\Api\Serialization\SerializerRegistry;
+use ReaCms\Api\Template\PluginApiRenderer;
 use ReaCms\Content\Slugger;
 use ReaCms\Core\Http\Request;
 use ReaCms\Core\Http\Response;
@@ -28,6 +28,7 @@ final class CmsController
         private readonly ViewRenderer $views,
         private readonly string $uploadRoot,
         private readonly OriginAllowlist $origins,
+        private readonly PluginApiRenderer $api,
     ) {
     }
 
@@ -44,7 +45,7 @@ final class CmsController
         }
         return $this->page($request, 'blog', $id === null ? 'New blog post' : 'Edit blog post', 'cms/blog/editor', [
             'post' => $post,
-            'media' => $this->contents->media(),
+            'media' => $this->contents->images(),
         ]);
     }
 
@@ -61,7 +62,7 @@ final class CmsController
         }
         $title = trim($form['title'] ?? '');
         $content = SafeHtml::sanitize($form['content'] ?? '')->value;
-        if ($title === '' || trim(strip_tags($content)) === '') {
+        if ($title === '' || (trim(strip_tags($content)) === '' && !str_contains($content, '<img'))) {
             return $this->failure($request, $session, $user, 422, 'Blog post incomplete', 'cms/message', [
                 'message' => 'A title and content are required.',
             ]);
@@ -76,6 +77,52 @@ final class CmsController
             'publish_at' => $status === 'published' ? date('Y-m-d H:i:s') : null,
         ]);
         return $this->auth->sessions->withCookie(Response::redirect('/cms/blog'), $session);
+    }
+
+    public function uploadBlogImage(Request $request): Response
+    {
+        $context = $this->authorized($request, 'blog');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        $form = $request->form();
+        if (!$this->auth->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+            return $this->auth->sessions->withCookie(Response::json(['error' => [
+                'code' => 'invalid_csrf',
+                'message' => 'The upload session expired. Refresh and try again.',
+            ]], 419), $session);
+        }
+        $file = $request->file('image');
+        if ($file === null || !$file->isValid()) {
+            return $this->auth->sessions->withCookie(Response::json([
+                'error' => ['code' => 'invalid_upload', 'message' => 'Choose a valid image to upload.'],
+            ], 422), $session);
+        }
+
+        try {
+            $stored = (new MediaIngestor(
+                $this->uploadRoot,
+                scanner: static fn (string $_path, string $mime): bool => str_starts_with($mime, 'image/'),
+            ))->ingest($file->temporaryPath, $file->clientName);
+            $altText = trim($form['alt_text'] ?? '');
+            $id = $this->contents->addMedia($stored, $user->id, $altText);
+        } catch (MediaException) {
+            return $this->auth->sessions->withCookie(Response::json([
+                'error' => [
+                    'code' => 'invalid_image',
+                    'message' => 'The image must be a valid JPEG, PNG, or WebP file no larger than 25 MB.',
+                ],
+            ], 422), $session);
+        }
+
+        return $this->auth->sessions->withCookie(Response::json(['media' => [
+            'id' => $id,
+            'url' => '/media/' . $id,
+            'thumbnailUrl' => '/cms/media/' . $id,
+            'alt' => $altText,
+            'title' => $stored['originalName'],
+        ]], 201), $session);
     }
 
     public function deleteBlog(Request $request, int $id): Response
@@ -96,15 +143,13 @@ final class CmsController
         if (!$this->galleryApiEnabled($request)) {
             return Response::json(['error' => ['code' => 'not_found', 'message' => 'Gallery is unavailable.']], 404);
         }
-        $serializer = (new SerializerRegistry())->get($format);
-        if ($serializer === null) {
-            return Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406);
-        }
         $presenter = new GalleryApiPresenter();
         $items = array_values(array_map($presenter->item(...), $this->publicGalleryItems()));
-        return $this->galleryCors(
+        return $this->serializeGallery(
             $request,
-            $serializer->serialize(['data' => $items, 'meta' => ['total' => count($items)]]),
+            $format,
+            'list',
+            ['data' => $items, 'meta' => ['total' => count($items)]],
         );
     }
 
@@ -117,7 +162,12 @@ final class CmsController
         if ($item === null || !$this->isPublicGalleryItem($item)) {
             return $this->galleryNotFound();
         }
-        return $this->serializeGallery($request, $format, ['data' => (new GalleryApiPresenter())->item($item)]);
+        return $this->serializeGallery(
+            $request,
+            $format,
+            'detail',
+            ['data' => (new GalleryApiPresenter())->item($item)],
+        );
     }
 
     public function galleryAlbumsFeed(Request $request, string $format): Response
@@ -132,7 +182,7 @@ final class CmsController
                 ($album['status'] ?? '') === 'published'
             ))
         ));
-        return $this->serializeGallery($request, $format, [
+        return $this->serializeGallery($request, $format, 'list', [
             'data' => $albums,
             'meta' => ['total' => count($albums)],
         ]);
@@ -147,7 +197,12 @@ final class CmsController
         if ($album === null || ($album['status'] ?? '') !== 'published') {
             return $this->galleryNotFound();
         }
-        return $this->serializeGallery($request, $format, ['data' => (new GalleryApiPresenter())->album($album)]);
+        return $this->serializeGallery(
+            $request,
+            $format,
+            'detail',
+            ['data' => (new GalleryApiPresenter())->album($album)],
+        );
     }
 
     public function galleryAlbumItemsFeed(Request $request, int $id, string $format): Response
@@ -161,7 +216,7 @@ final class CmsController
         }
         $presenter = new GalleryApiPresenter();
         $items = array_map($presenter->item(...), $this->publicGalleryItems($id));
-        return $this->serializeGallery($request, $format, [
+        return $this->serializeGallery($request, $format, 'list', [
             'data' => $items,
             'meta' => ['albumId' => $id, 'total' => count($items)],
         ]);
@@ -390,15 +445,15 @@ final class CmsController
     }
 
     /** @param array<string, mixed> $document */
-    private function serializeGallery(Request $request, string $format, array $document): Response
+    private function serializeGallery(Request $request, string $format, string $mode, array $document): Response
     {
         if ($this->auth->plugins->find('gallery')?->state !== 'enabled') {
             return $this->galleryNotFound();
         }
-        $serializer = (new SerializerRegistry())->get($format);
-        return $serializer === null
+        $response = $this->api->render('gallery', 'gallery', $format, $mode, $document);
+        return $response === null
             ? Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406)
-            : $this->galleryCors($request, $serializer->serialize($document));
+            : $this->galleryCors($request, $response);
     }
 
     private function galleryNotFound(): Response

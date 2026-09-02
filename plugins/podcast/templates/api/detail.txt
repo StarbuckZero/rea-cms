@@ -1,0 +1,7 @@
+Title: {podcast.title}
+
+{podcast.description}
+
+{podcast.content}
+
+{podcast.link}

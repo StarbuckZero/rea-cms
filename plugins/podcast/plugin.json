@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "podcast",
   "name": "Podcast Feeds",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "reaCmsVersion": "^1.0",
   "description": "Database-backed podcast RSS synchronization and cached API feeds.",
   "author": "Rea CMS",
@@ -10,7 +10,8 @@
   "tables": [
     "plugin_podcast_feeds",
     "plugin_podcast_episodes",
-    "plugin_podcast_settings"
+    "plugin_podcast_settings",
+    "plugin_podcast_schedule_days"
   ],
   "permissions": [
     "podcast.feeds.view",
@@ -23,6 +24,28 @@
   "api": {
     "resource": "podcast",
     "formats": ["json", "html", "txt"],
-    "defaultPolicy": "same-origin"
+    "defaultPolicy": "same-origin",
+    "fields": {
+      "id":{"type":"integer","label":"ID","description":"Unique feed or episode identifier."},
+      "slug":{"type":"string","label":"Slug","description":"URL-safe feed or episode slug."},
+      "title":{"type":"string","label":"Title","description":"Podcast or episode title."},
+      "description":{"type":"html","label":"Description","description":"Podcast or episode description."},
+      "content":{"type":"html","label":"Content","description":"Full episode rich-text content."},
+      "link":{"type":"url","label":"Website link","description":"Publisher website link."},
+      "language":{"type":"string","label":"Language","description":"Podcast language code."},
+      "author":{"type":"string","label":"Author","description":"Podcast author or publisher."},
+      "imageUrl":{"type":"url","label":"Image URL","description":"Podcast or episode artwork URL."},
+      "explicit":{"type":"boolean","label":"Explicit","description":"Explicit-content indicator."},
+      "feed.id":{"type":"integer","label":"Feed ID","description":"Parent feed identifier for an episode."},
+      "feed.slug":{"type":"string","label":"Feed slug","description":"Parent feed slug for an episode."},
+      "feed.title":{"type":"string","label":"Feed title","description":"Parent feed title for an episode."},
+      "guid":{"type":"string","label":"GUID","description":"Source feed episode identifier."},
+      "audio.url":{"type":"url","label":"Audio URL","description":"Episode audio file URL."},
+      "audio.length":{"type":"integer","label":"Audio length","description":"Episode audio size in bytes when supplied."},
+      "audio.type":{"type":"string","label":"Audio MIME type","description":"Episode audio MIME type."},
+      "audio.durationSeconds":{"type":"integer","label":"Duration","description":"Episode duration in seconds."},
+      "episodeType":{"type":"string","label":"Episode type","description":"Full, trailer, or bonus episode classification."},
+      "publishedAt":{"type":"datetime","label":"Published date","description":"Episode publication timestamp in ISO 8601 format."}
+    }
   }
 }

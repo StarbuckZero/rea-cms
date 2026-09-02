@@ -1,0 +1,3 @@
+[{gallery.title}]
+ID: {gallery.id}
+Media: {gallery.media}

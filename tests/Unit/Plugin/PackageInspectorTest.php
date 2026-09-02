@@ -89,6 +89,27 @@ final class PackageInspectorTest extends TestCase
         (new PackageInspector(new ManifestValidator()))->inspect($archive, $this->temporaryDirectory());
     }
 
+    public function testHtmlAndTextApisRequireListAndDetailTemplates(): void
+    {
+        $manifest = json_decode($this->manifest(), true, 32, JSON_THROW_ON_ERROR);
+        self::assertIsArray($manifest);
+        $manifest['api'] = [
+            'resource' => 'notes',
+            'formats' => ['json', 'html', 'txt'],
+            'defaultPolicy' => 'same-origin',
+        ];
+        $archive = $this->archive([
+            'notes/plugin.json' => json_encode($manifest, JSON_THROW_ON_ERROR),
+            'notes/templates/api/list.html' => '<h2>{notes.title}</h2>',
+            'notes/templates/api/detail.html' => '<h1>{notes.title}</h1>',
+            'notes/templates/api/list.txt' => '{notes.title}',
+        ]);
+
+        $this->expectException(PluginException::class);
+        $this->expectExceptionMessage('templates/api/detail.txt');
+        (new PackageInspector(new ManifestValidator()))->inspect($archive, $this->temporaryDirectory());
+    }
+
     public function testExpansionLimitRejectsBombLikeEntry(): void
     {
         $archive = $this->archive([

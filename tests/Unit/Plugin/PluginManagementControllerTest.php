@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use ReaCms\Api\RateLimit\RateLimitDecision;
 use ReaCms\Api\RateLimit\RateLimiter;
+use ReaCms\Api\Template\PluginApiFieldCatalog;
 use ReaCms\Auth\AuthServices;
 use ReaCms\Auth\LoginService;
 use ReaCms\Auth\PasswordHasher;
@@ -32,6 +33,7 @@ use ReaCms\Tests\Support\InMemoryAuthorization;
 use ReaCms\Tests\Support\InMemoryLoginThrottle;
 use ReaCms\Tests\Support\InMemoryPasswordResetRepository;
 use ReaCms\Tests\Support\InMemoryPluginAccess;
+use ReaCms\Tests\Support\InMemoryPluginApiTemplateRepository;
 use ReaCms\Tests\Support\InMemoryPluginDataManager;
 use ReaCms\Tests\Support\InMemoryPluginRegistry;
 use ReaCms\Tests\Support\InMemorySessionRepository;
@@ -48,6 +50,7 @@ final class PluginManagementControllerTest extends TestCase
     private SessionManager $sessions;
     private Csrf $csrf;
     private PluginManagementController $controller;
+    private InMemoryPluginApiTemplateRepository $apiTemplates;
 
     protected function setUp(): void
     {
@@ -94,6 +97,7 @@ final class PluginManagementControllerTest extends TestCase
                 return new RateLimitDecision(true, $maximum - 1, 0);
             }
         };
+        $this->apiTemplates = new InMemoryPluginApiTemplateRepository();
         $this->controller = new PluginManagementController(
             $services,
             new ViewRenderer(dirname(__DIR__, 3) . '/resources/views'),
@@ -109,6 +113,8 @@ final class PluginManagementControllerTest extends TestCase
             $this->data,
             $rateLimiter,
             $this->clock,
+            $this->apiTemplates,
+            new PluginApiFieldCatalog($this->root . '/plugins'),
             $this->root . '/staging',
         );
     }
@@ -246,6 +252,122 @@ final class PluginManagementControllerTest extends TestCase
         self::assertNull($this->plugins->find('notes'));
     }
 
+    public function testAdministratorCanEditValidatedApiTemplates(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->plugins->records['notes'] = $this->record('enabled');
+        $session = $this->authenticatedSession();
+
+        $page = $this->controller->apiTemplates(
+            $this->request('GET', '/admin/plugins/notes/api-templates', $session),
+            'notes',
+        );
+        self::assertSame(200, $page->status());
+        self::assertStringContainsString('Notes API templates', $page->body());
+        self::assertStringContainsString('{notes.title}', $page->body());
+        self::assertStringContainsString('data-template-binding="{notes.title}"', $page->body());
+        self::assertStringContainsString('Note title.', $page->body());
+        self::assertStringContainsString('data-template-preview="html_list"', $page->body());
+        self::assertSame(4, substr_count($page->body(), 'data-template-textarea'));
+        self::assertStringContainsString('/assets/api-template-editor.js?v=1', $page->body());
+        self::assertStringContainsString('Restore packaged defaults', $page->body());
+
+        $saved = $this->controller->saveApiTemplates($this->formRequest(
+            '/admin/plugins/notes/api-templates',
+            $session,
+            [
+                'html_list' => '<h2>{notes.title}</h2>',
+                'html_detail' => '<h1>{notes.title}</h1>',
+                'txt_list' => '[{notes.title}]',
+                'txt_detail' => "Title: {notes.title}\n{notes.body}",
+            ],
+        ), 'notes');
+
+        self::assertSame(303, $saved->status());
+        self::assertSame('<h2>{notes.title}</h2>', $this->apiTemplates->templates['notes']['html_list']);
+    }
+
+    public function testApiTemplateEditorRejectsExecutableMarkup(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->plugins->records['notes'] = $this->record('enabled');
+        $session = $this->authenticatedSession();
+        $response = $this->controller->saveApiTemplates($this->formRequest(
+            '/admin/plugins/notes/api-templates',
+            $session,
+            [
+                'html_list' => '<script>alert(1)</script>',
+                'html_detail' => '<h1>{notes.title}</h1>',
+                'txt_list' => '{notes.title}',
+                'txt_detail' => '{notes.title}',
+            ],
+        ), 'notes');
+
+        self::assertSame(422, $response->status());
+        self::assertStringContainsString('executable syntax', $response->body());
+        self::assertArrayNotHasKey('notes', $this->apiTemplates->templates);
+    }
+
+    public function testApiTemplatePreviewUsesSafeGeneratedPluginDataWithoutSaving(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->plugins->records['notes'] = $this->record('enabled');
+        $session = $this->authenticatedSession();
+        $response = $this->controller->previewApiTemplate($this->formRequest(
+            '/admin/plugins/notes/api-templates/preview',
+            $session,
+            ['slot' => 'html_detail', 'template' => '<h1>{notes.title}</h1>{notes.body | sanitized_html}'],
+        ), 'notes');
+
+        self::assertSame(200, $response->status());
+        $payload = json_decode($response->body(), true, 32, JSON_THROW_ON_ERROR);
+        self::assertSame('html', $payload['format']);
+        self::assertStringContainsString('<h1>Sample title</h1>', $payload['output']);
+        self::assertStringContainsString('<p>Sample body.</p>', $payload['output']);
+        self::assertArrayNotHasKey('notes', $this->apiTemplates->templates);
+    }
+
+    public function testPackagedTemplateResetRemovesSavedOverrides(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->plugins->records['notes'] = $this->record('enabled');
+        $this->apiTemplates->templates['notes'] = [
+            'html_list' => 'custom',
+            'html_detail' => 'custom',
+            'txt_list' => 'custom',
+            'txt_detail' => 'custom',
+        ];
+        $session = $this->authenticatedSession();
+        $response = $this->controller->resetApiTemplates($this->formRequest(
+            '/admin/plugins/notes/api-templates/reset',
+            $session,
+            [],
+        ), 'notes');
+
+        self::assertSame(303, $response->status());
+        self::assertSame(
+            '/admin/plugins/notes/api-templates?result=reset',
+            $response->header('Location'),
+        );
+        self::assertArrayNotHasKey('notes', $this->apiTemplates->templates);
+    }
+
     private function record(string $state): PluginRecord
     {
         return new PluginRecord(
@@ -259,6 +381,30 @@ final class PluginManagementControllerTest extends TestCase
             '/cms/notes',
             'Example Author',
             ['plugin_notes_entries'],
+            [
+                'api' => [
+                    'resource' => 'notes',
+                    'formats' => ['json', 'html', 'txt'],
+                    'defaultPolicy' => 'same-origin',
+                    'fields' => [
+                        'id' => [
+                            'type' => 'integer',
+                            'label' => 'Note ID',
+                            'description' => 'Unique note identifier.',
+                        ],
+                        'title' => [
+                            'type' => 'string',
+                            'label' => 'Title',
+                            'description' => 'Note title.',
+                        ],
+                        'body' => [
+                            'type' => 'html',
+                            'label' => 'Body',
+                            'description' => 'Note content.',
+                        ],
+                    ],
+                ],
+            ],
         );
     }
 

@@ -22,6 +22,7 @@ final class InMemoryPodcastRepository implements PodcastRepository
     public int $unchanged = 0;
     public int $failed = 0;
     public ?string $lastError = null;
+    public ?DateTimeImmutable $rescheduledAt = null;
 
     public function __construct()
     {
@@ -51,11 +52,16 @@ final class InMemoryPodcastRepository implements PodcastRepository
         return null;
     }
 
+    /** @param list<\ReaCms\Podcast\PodcastScheduleDay> $scheduleDays */
     public function createFeed(
         string $slug,
         string $rssUrl,
         ?int $refreshIntervalMinutes,
         bool $automaticRefresh,
+        string $refreshMode,
+        bool $scheduleEnabled,
+        string $scheduleTimezone,
+        array $scheduleDays,
     ): PodcastFeed {
         $feed = new PodcastFeed(
             count($this->records) + 1,
@@ -64,11 +70,16 @@ final class InMemoryPodcastRepository implements PodcastRepository
             true,
             $refreshIntervalMinutes,
             $automaticRefresh,
+            refreshMode: $refreshMode,
+            scheduleEnabled: $scheduleEnabled,
+            scheduleTimezone: $scheduleTimezone,
+            scheduleDays: $scheduleDays,
         );
         $this->records[$feed->id] = $feed;
         return $feed;
     }
 
+    /** @param list<\ReaCms\Podcast\PodcastScheduleDay> $scheduleDays */
     public function updateFeed(
         int $id,
         string $slug,
@@ -76,6 +87,10 @@ final class InMemoryPodcastRepository implements PodcastRepository
         bool $enabled,
         ?int $refreshIntervalMinutes,
         bool $automaticRefresh,
+        string $refreshMode,
+        bool $scheduleEnabled,
+        string $scheduleTimezone,
+        array $scheduleDays,
     ): void {
     }
 
@@ -116,6 +131,11 @@ final class InMemoryPodcastRepository implements PodcastRepository
         }
         $this->locked = true;
         return 'lock';
+    }
+
+    public function rescheduleFeed(int $feedId, DateTimeImmutable $nextRefreshAt): void
+    {
+        $this->rescheduledAt = $nextRefreshAt;
     }
 
     public function storeUpdatedFeed(

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use ReaCms\Podcast\PodcastFeed;
 use ReaCms\Podcast\PodcastSettings;
+use ReaCms\Podcast\PodcastSchedule;
 
 /** @var callable(mixed): string $escape */
 /** @var list<PodcastFeed> $feeds */
 /** @var PodcastSettings $settings */
 /** @var string $csrfToken */
 /** @var string $message */
+/** @var PodcastSchedule $schedule */
 ?>
 <section>
     <p class="eyebrow">Content</p>
@@ -42,6 +44,7 @@ use ReaCms\Podcast\PodcastSettings;
                             <span class="text-sm text-secondary"><?= $feed->enabled ? 'Enabled' : 'Disabled' ?></span>
                         </td>
                         <td>
+                            <?php $scheduleError = $schedule->configurationError($feed); ?>
                             <?= $escape($feed->refreshStatus) ?>
                             <?php if ($feed->lastHttpStatus !== null) : ?>
                                 (HTTP <?= (int) $feed->lastHttpStatus ?>)
@@ -49,11 +52,37 @@ use ReaCms\Podcast\PodcastSettings;
                             <?php if ($feed->lastError !== null) : ?>
                                 <br><span class="text-sm text-secondary"><?= $escape($feed->lastError) ?></span>
                             <?php endif; ?>
+                            <?php if ($scheduleError !== null) : ?>
+                                <br><span class="text-sm text-secondary">Configuration issue: <?= $escape($scheduleError) ?></span>
+                            <?php endif; ?>
                         </td>
                         <td>
-                            <span class="text-sm">Checked: <?= $escape($feed->lastCheckedAt?->format(DATE_ATOM) ?? 'Never') ?></span><br>
-                            <span class="text-sm">Updated: <?= $escape($feed->lastChangedAt?->format(DATE_ATOM) ?? 'Never') ?></span><br>
-                            <span class="text-sm">Next: <?= $escape($feed->nextRefreshAt?->format(DATE_ATOM) ?? 'On request') ?></span>
+                            <?php if ($feed->refreshMode === PodcastSchedule::MODE_SCHEDULE) : ?>
+                                <span class="text-sm">Weekly schedule: <?= $feed->scheduleEnabled ? 'Enabled' : 'Paused' ?></span><br>
+                                <span class="text-sm">Timezone: <?= $escape($feed->scheduleTimezone) ?></span><br>
+                                <span class="text-sm">Days:
+                                    <?= $escape(implode(', ', array_map(
+                                        static fn ($day): string => $day->name() . ' ' . $day->localTime,
+                                        $feed->scheduleDays,
+                                    )) ?: 'None') ?>
+                                </span><br>
+                            <?php else : ?>
+                                <span class="text-sm">Interval: <?= (int) $settings->intervalFor($feed) ?> minutes</span><br>
+                            <?php endif; ?>
+                            <?php if ($schedule->validTimezone($feed->scheduleTimezone)) : ?>
+                                <?php $displayTimezone = new DateTimeZone($feed->scheduleTimezone); ?>
+                                <span class="text-sm">Checked: <?= $escape($feed->lastCheckedAt?->setTimezone($displayTimezone)->format(DATE_ATOM) ?? 'Never') ?></span><br>
+                                <span class="text-sm">Updated: <?= $escape($feed->lastChangedAt?->setTimezone($displayTimezone)->format(DATE_ATOM) ?? 'Never') ?></span><br>
+                                <span class="text-sm">Next:
+                                    <?php if ($feed->refreshMode === PodcastSchedule::MODE_SCHEDULE && !$feed->scheduleEnabled) : ?>
+                                        Paused
+                                    <?php else : ?>
+                                        <?= $escape($feed->nextRefreshAt?->setTimezone($displayTimezone)->format(DATE_ATOM) ?? 'Not scheduled') ?>
+                                    <?php endif; ?>
+                                </span>
+                            <?php else : ?>
+                                <span class="text-sm">Schedule times unavailable until the timezone is corrected.</span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <a href="/cms/podcast/<?= (int) $feed->id ?>/edit">Edit</a>

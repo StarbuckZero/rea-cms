@@ -18,5 +18,32 @@
     "gallery.albums.update",
     "gallery.albums.delete"
   ],
-  "api": {"resource":"gallery","formats":["json","html","txt"],"defaultPolicy":"same-origin"}
+  "api": {
+    "resource":"gallery",
+    "formats":["json","html","txt"],
+    "defaultPolicy":"same-origin",
+    "fields": {
+      "id":{"type":"integer","label":"ID","description":"Unique gallery item or album identifier."},
+      "albumId":{"type":"integer","label":"Album ID","description":"Parent album identifier when the item belongs to an album."},
+      "title":{"type":"string","label":"Title","description":"Gallery item or album title."},
+      "name":{"type":"string","label":"Name","description":"Album display name."},
+      "slug":{"type":"string","label":"Slug","description":"URL-safe album slug."},
+      "caption":{"type":"text","label":"Caption","description":"Gallery item caption."},
+      "description":{"type":"text","label":"Description","description":"Album description."},
+      "altText":{"type":"string","label":"Alternative text","description":"Accessible description for gallery media."},
+      "mediaType":{"type":"string","label":"Media type","description":"Image or video classification."},
+      "mimeType":{"type":"string","label":"MIME type","description":"Media MIME type."},
+      "media":{"type":"url","label":"Media URL","description":"Public URL for the gallery media."},
+      "image":{"type":"url","label":"Image URL","description":"Legacy image-compatible media URL."},
+      "cover":{"type":"url","label":"Cover URL","description":"Album cover image URL."},
+      "displayOrder":{"type":"integer","label":"Display order","description":"Gallery item ordering position."},
+      "itemCount":{"type":"integer","label":"Item count","description":"Number of public items in the album."},
+      "status":{"type":"string","label":"Status","description":"Album publication status."},
+      "active":{"type":"boolean","label":"Active","description":"Whether the album is published."},
+      "createdAt":{"type":"datetime","label":"Created date","description":"Creation timestamp."},
+      "updatedAt":{"type":"datetime","label":"Updated date","description":"Last-update timestamp."},
+      "links.self":{"type":"url","label":"Self link","description":"Canonical JSON API link."},
+      "links.items":{"type":"url","label":"Items link","description":"JSON API link to the album items."}
+    }
+  }
 }

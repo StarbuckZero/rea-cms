@@ -21,13 +21,32 @@
       "required": ["resource", "formats", "defaultPolicy"],
       "properties": {
         "resource": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,31}$"},
+        "binding": {"type": "string", "pattern": "^[a-z][a-zA-Z0-9_-]{1,31}$"},
         "formats": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {"enum": ["json", "html", "txt"]}
         },
-        "defaultPolicy": {"enum": ["public", "same-origin", "authenticated"]}
+        "defaultPolicy": {"enum": ["public", "same-origin", "authenticated"]},
+        "fields": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 128,
+          "patternProperties": {
+            "^[a-z][a-zA-Z0-9_]*(\\.[a-z][a-zA-Z0-9_]*)*$": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type"],
+              "properties": {
+                "type": {"enum": ["string", "text", "html", "integer", "number", "boolean", "datetime", "url"]},
+                "label": {"type": "string", "minLength": 1, "maxLength": 64},
+                "description": {"type": "string", "maxLength": 255}
+              }
+            }
+          },
+          "additionalProperties": false
+        }
       }
     },
     "navigation": {

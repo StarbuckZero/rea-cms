@@ -1,0 +1,14 @@
+{
+  "operations": [
+    {"action":"add_column","table":"plugin_podcast_feeds","column":{"name":"refresh_mode","type":"varchar","length":16,"nullable":true}},
+    {"action":"add_column","table":"plugin_podcast_feeds","column":{"name":"schedule_enabled","type":"boolean","nullable":true}},
+    {"action":"add_column","table":"plugin_podcast_feeds","column":{"name":"schedule_timezone","type":"varchar","length":191,"nullable":true}},
+    {"action":"create_table","table":"plugin_podcast_schedule_days","columns":[
+      {"name":"id","type":"bigint","primary":true,"autoIncrement":true},
+      {"name":"feed_id","type":"bigint"},
+      {"name":"day_of_week","type":"integer"},
+      {"name":"local_time","type":"varchar","length":5}
+    ]},
+    {"action":"create_index","table":"plugin_podcast_schedule_days","name":"podcast_schedule_feed_day_unique","columns":["feed_id","day_of_week"],"unique":true}
+  ]
+}

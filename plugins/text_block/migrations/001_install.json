@@ -1,0 +1,28 @@
+{
+  "operations": [
+    {
+      "action": "create_table",
+      "table": "plugin_text_block_blocks",
+      "columns": [
+        {"name":"id","type":"bigint","primary":true,"autoIncrement":true},
+        {"name":"name","type":"varchar","length":191},
+        {"name":"content","type":"text"},
+        {"name":"created_at","type":"datetime"},
+        {"name":"updated_at","type":"datetime"}
+      ]
+    },
+    {
+      "action": "create_index",
+      "table": "plugin_text_block_blocks",
+      "name": "text_block_name_unique",
+      "columns": ["name"],
+      "unique": true
+    },
+    {
+      "action": "create_index",
+      "table": "plugin_text_block_blocks",
+      "name": "text_block_updated_index",
+      "columns": ["updated_at"]
+    }
+  ]
+}

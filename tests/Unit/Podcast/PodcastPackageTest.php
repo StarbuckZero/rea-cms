@@ -25,10 +25,17 @@ final class PodcastPackageTest extends TestCase
             'plugin_podcast_feeds',
             'plugin_podcast_episodes',
             'plugin_podcast_settings',
+            'plugin_podcast_schedule_days',
         ], $manifest->tables);
         self::assertCount(8, $sql);
         self::assertStringContainsString('plugin_podcast_episodes', implode(' ', $sql));
         self::assertStringNotContainsString('rea_users', implode(' ', $sql));
         self::assertSame([], glob($root . '/**/*.php') ?: []);
+
+        $scheduleMigration = file_get_contents($root . '/migrations/002_weekly_schedule.json');
+        self::assertIsString($scheduleMigration);
+        $scheduleSql = (new DeclarativeMigration())->compile('podcast', $manifest, $scheduleMigration);
+        self::assertStringContainsString('schedule_timezone', implode(' ', $scheduleSql));
+        self::assertStringContainsString('CREATE UNIQUE INDEX', implode(' ', $scheduleSql));
     }
 }

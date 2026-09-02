@@ -10,22 +10,44 @@ use Throwable;
 
 final class PodcastFeedSyncService
 {
+    private readonly PodcastSchedule $schedule;
+
     public function __construct(
         private readonly PodcastRepository $repository,
         private readonly FeedFetcher $fetcher,
         private readonly PodcastFeedParser $parser,
         private readonly Clock $clock,
+        ?PodcastSchedule $schedule = null,
     ) {
+        $this->schedule = $schedule ?? new PodcastSchedule();
     }
 
     public function refreshIfDue(PodcastFeed $feed): bool
     {
         $settings = $this->repository->settings();
-        if (!$settings->automaticRefresh || !$feed->automaticRefresh || !$feed->enabled) {
+        if (!$settings->automaticRefresh || !$feed->enabled) {
+            return false;
+        }
+        if ($feed->refreshMode === PodcastSchedule::MODE_SCHEDULE) {
+            if (!$feed->scheduleEnabled || $this->schedule->configurationError($feed) !== null) {
+                return false;
+            }
+        } elseif (!$feed->automaticRefresh) {
             return false;
         }
         $now = $this->clock->now();
+        if ($feed->nextRefreshAt === null && $feed->refreshMode === PodcastSchedule::MODE_SCHEDULE) {
+            $this->repository->rescheduleFeed($feed->id, $this->nextRefresh($feed, $settings, $now));
+            return false;
+        }
         if ($feed->nextRefreshAt !== null && $feed->nextRefreshAt > $now) {
+            return false;
+        }
+        if (
+            $feed->refreshMode === PodcastSchedule::MODE_SCHEDULE
+            && !$this->schedule->shouldRunNow($feed, $now)
+        ) {
+            $this->repository->rescheduleFeed($feed->id, $this->schedule->nextRun($feed, $now));
             return false;
         }
         return $this->refresh($feed, $settings, false);
@@ -50,7 +72,7 @@ final class PodcastFeedSyncService
     private function refresh(PodcastFeed $feed, PodcastSettings $settings, bool $throwOnFailure): bool
     {
         $now = $this->clock->now();
-        $next = $now->add(new DateInterval('PT' . $settings->intervalFor($feed) . 'M'));
+        $next = $this->nextRefresh($feed, $settings, $now);
         $token = $this->repository->acquireRefreshLock($feed->id, $now);
         if ($token === null) {
             return false;
@@ -86,5 +108,19 @@ final class PodcastFeedSyncService
             }
             return false;
         }
+    }
+
+    private function nextRefresh(
+        PodcastFeed $feed,
+        PodcastSettings $settings,
+        \DateTimeImmutable $now,
+    ): \DateTimeImmutable {
+        if (
+            $feed->refreshMode === PodcastSchedule::MODE_SCHEDULE
+            && $feed->scheduleEnabled
+        ) {
+            return $this->schedule->nextRun($feed, $now);
+        }
+        return $now->add(new DateInterval('PT' . $settings->intervalFor($feed) . 'M'));
     }
 }

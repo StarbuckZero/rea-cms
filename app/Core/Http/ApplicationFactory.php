@@ -8,6 +8,9 @@ use ReaCms\Api\ApiController;
 use ReaCms\Api\ApiControllerFactory;
 use ReaCms\Api\Policy\OriginAllowlist;
 use ReaCms\Api\RateLimit\PdoRateLimiter;
+use ReaCms\Api\Template\PdoPluginApiTemplateRepository;
+use ReaCms\Api\Template\PluginApiFieldCatalog;
+use ReaCms\Api\Template\PluginApiRenderer;
 use ReaCms\Auth\AuthController;
 use ReaCms\Auth\AuthServicesFactory;
 use ReaCms\Blog\BlogController;
@@ -31,6 +34,8 @@ use ReaCms\Plugin\PluginManagementController;
 use ReaCms\Podcast\PodcastController;
 use ReaCms\Podcast\PodcastControllerFactory;
 use ReaCms\Support\SystemClock;
+use ReaCms\TextBlock\TextBlockController;
+use ReaCms\TextBlock\TextBlockControllerFactory;
 
 final class ApplicationFactory
 {
@@ -48,8 +53,12 @@ final class ApplicationFactory
             $views,
         );
         $api = static fn (): ApiController => ApiControllerFactory::create($environment);
-        $blog = static fn (): BlogController => BlogControllerFactory::create($environment);
+        $blog = static fn (): BlogController => BlogControllerFactory::create($environment, $projectRoot);
         $podcast = static fn (): PodcastController => PodcastControllerFactory::create($environment, $projectRoot);
+        $textBlock = static fn (): TextBlockController => TextBlockControllerFactory::create(
+            $environment,
+            $projectRoot,
+        );
         $cms = static function () use ($environment, $views, $projectRoot): CmsController {
             $pdo = ConnectionFactory::create($environment);
             $prefix = $environment->get('DB_TABLE_PREFIX', 'rea_') ?? 'rea_';
@@ -66,6 +75,11 @@ final class ApplicationFactory
                     $environment->require('APP_URL'),
                     ...$configured,
                 ]))),
+                new PluginApiRenderer(new PdoPluginApiTemplateRepository(
+                    $pdo,
+                    $projectRoot . '/plugins',
+                    $prefix,
+                )),
             );
         };
         $pluginManagement = static function () use (
@@ -94,6 +108,8 @@ final class ApplicationFactory
                 new PdoPluginDataManager($pdo, $projectRoot . '/storage/backups/plugins/data', $prefix),
                 new PdoRateLimiter($pdo, $prefix),
                 new SystemClock(),
+                new PdoPluginApiTemplateRepository($pdo, $projectRoot . '/plugins', $prefix),
+                new PluginApiFieldCatalog($projectRoot . '/plugins'),
                 $staging,
             );
         };
@@ -173,6 +189,29 @@ final class ApplicationFactory
                 $parameters['format'],
             ),
         );
+        $router->get(
+            '/api/v1/text-block.{format}',
+            static fn (Request $request, array $parameters): Response => $textBlock()->collection(
+                $request,
+                $parameters['format'],
+            ),
+        );
+        $router->get(
+            '/api/v1/text-block/name/{name}.{format}',
+            static fn (Request $request, array $parameters): Response => $textBlock()->named(
+                $request,
+                $parameters['name'],
+                $parameters['format'],
+            ),
+        );
+        $router->get(
+            '/api/v1/text-block/{id}.{format}',
+            static fn (Request $request, array $parameters): Response => $textBlock()->item(
+                $request,
+                (int) $parameters['id'],
+                $parameters['format'],
+            ),
+        );
         $router->get('/login', static fn (Request $request): Response => $auth()->loginForm($request));
         $router->post('/login', static fn (Request $request): Response => $auth()->login($request));
         $router->post('/logout', static fn (Request $request): Response => $auth()->logout($request));
@@ -186,6 +225,7 @@ final class ApplicationFactory
         $router->get('/cms/blog', static fn (Request $request): Response => $cms()->blogIndex($request));
         $router->get('/cms/blog/new', static fn (Request $request): Response => $cms()->blogForm($request));
         $router->post('/cms/blog', static fn (Request $request): Response => $cms()->saveBlog($request));
+        $router->post('/cms/blog/media', static fn (Request $request): Response => $cms()->uploadBlogImage($request));
         $router->get(
             '/cms/blog/{id}/edit',
             static fn (Request $request, array $parameters): Response => $cms()->blogForm(
@@ -321,6 +361,30 @@ final class ApplicationFactory
                 (int) $parameters['id'],
             ),
         );
+        $router->get('/cms/text-block', static fn (Request $request): Response => $textBlock()->index($request));
+        $router->get('/cms/text-block/new', static fn (Request $request): Response => $textBlock()->form($request));
+        $router->post('/cms/text-block', static fn (Request $request): Response => $textBlock()->save($request));
+        $router->get(
+            '/cms/text-block/{id}/edit',
+            static fn (Request $request, array $parameters): Response => $textBlock()->form(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/cms/text-block/{id}',
+            static fn (Request $request, array $parameters): Response => $textBlock()->save(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/cms/text-block/{id}/delete',
+            static fn (Request $request, array $parameters): Response => $textBlock()->delete(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
         $router->get(
             '/api/v1/gallery.{format}',
             static fn (Request $request, array $parameters): Response => $cms()->galleryFeed(
@@ -403,6 +467,34 @@ final class ApplicationFactory
         $router->post(
             '/admin/plugins/{id}/uninstall',
             static fn (Request $request, array $parameters): Response => $pluginManagement()->uninstall(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->get(
+            '/admin/plugins/{id}/api-templates',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->apiTemplates(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/admin/plugins/{id}/api-templates',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->saveApiTemplates(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/admin/plugins/{id}/api-templates/preview',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->previewApiTemplate(
+                $request,
+                $parameters['id'],
+            ),
+        );
+        $router->post(
+            '/admin/plugins/{id}/api-templates/reset',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->resetApiTemplates(
                 $request,
                 $parameters['id'],
             ),

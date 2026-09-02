@@ -54,6 +54,20 @@ final class ManifestValidatorTest extends TestCase
             'formats' => [['php']],
             'defaultPolicy' => 'same-origin',
         ]]];
+        yield 'executable API field metadata' => [['api' => [
+            'resource' => 'notes',
+            'formats' => ['json', 'html', 'txt'],
+            'defaultPolicy' => 'same-origin',
+            'fields' => [
+                'title' => ['type' => 'string', 'renderer' => 'system'],
+            ],
+        ]]];
+        yield 'executable API binding' => [['api' => [
+            'resource' => 'notes',
+            'binding' => 'notes.value()',
+            'formats' => ['json'],
+            'defaultPolicy' => 'same-origin',
+        ]]];
     }
 
     private function manifest(): string

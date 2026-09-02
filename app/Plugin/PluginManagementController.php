@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace ReaCms\Plugin;
 
 use ReaCms\Api\RateLimit\RateLimiter;
+use ReaCms\Api\Template\PluginApiFieldCatalog;
+use ReaCms\Api\Template\PluginApiTemplateRepository;
 use ReaCms\Auth\AuthServices;
 use ReaCms\Auth\SessionContext;
 use ReaCms\Auth\User;
@@ -26,6 +28,8 @@ final class PluginManagementController
         private readonly PluginDataManager $data,
         private readonly RateLimiter $rateLimiter,
         private readonly Clock $clock,
+        private readonly PluginApiTemplateRepository $apiTemplates,
+        private readonly PluginApiFieldCatalog $apiFields,
         private readonly string $stagingRoot,
     ) {
     }
@@ -283,6 +287,189 @@ final class PluginManagementController
         return $this->redirect($session, '/admin/plugins?result=purged');
     }
 
+    public function apiTemplates(Request $request, string $pluginId): Response
+    {
+        $context = $this->authorized($request, 'core.plugins.manage');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        $plugin = $this->auth->plugins->find($pluginId);
+        if ($plugin === null || !$this->supportsApiTemplates($plugin)) {
+            return $this->indexError(
+                $request,
+                $session,
+                $user,
+                'That plugin does not expose editable API templates.',
+                404,
+            );
+        }
+
+        return $this->apiTemplatePage(
+            $request,
+            $session,
+            $user,
+            $plugin,
+            $this->apiTemplates->all($pluginId),
+            match ($request->query()['result'] ?? null) {
+                'saved' => 'API templates saved.',
+                'reset' => 'Packaged API templates restored.',
+                default => null,
+            },
+        );
+    }
+
+    public function saveApiTemplates(Request $request, string $pluginId): Response
+    {
+        $context = $this->authorized($request, 'core.plugins.manage');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        if (!$this->validCsrf($session, $request->form()['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $user, $request->path());
+        }
+        $plugin = $this->auth->plugins->find($pluginId);
+        if ($plugin === null || !$this->supportsApiTemplates($plugin)) {
+            return $this->indexError(
+                $request,
+                $session,
+                $user,
+                'That plugin does not expose editable API templates.',
+                404,
+            );
+        }
+
+        $form = $request->form();
+        $templates = [
+            'html_list' => $form['html_list'] ?? '',
+            'html_detail' => $form['html_detail'] ?? '',
+            'txt_list' => $form['txt_list'] ?? '',
+            'txt_detail' => $form['txt_detail'] ?? '',
+        ];
+        try {
+            $validator = new SafeTemplate();
+            foreach ($templates as $slot => $template) {
+                if (trim($template) === '' || strlen($template) > 60_000) {
+                    throw new PluginException('Each API template is required and must be no larger than 60 KB.');
+                }
+                str_starts_with($slot, 'txt_')
+                    ? $validator->renderText($template, [])
+                    : $validator->render($template, []);
+            }
+            $this->apiTemplates->save($pluginId, $templates);
+        } catch (PluginException $exception) {
+            return $this->apiTemplatePage(
+                $request,
+                $session,
+                $user,
+                $plugin,
+                $templates,
+                null,
+                $exception->getMessage(),
+                422,
+            );
+        }
+        $this->auth->audit->record(
+            'plugin.api_templates_updated',
+            $user->id,
+            $request->clientIp(),
+            $request->requestId(),
+            [],
+            'plugin',
+            $pluginId,
+        );
+
+        return $this->redirect($session, '/admin/plugins/' . $pluginId . '/api-templates?result=saved');
+    }
+
+    public function previewApiTemplate(Request $request, string $pluginId): Response
+    {
+        $context = $this->authorized($request, 'core.plugins.manage');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        if (!$this->validCsrf($session, $request->form()['_csrf'] ?? null)) {
+            $this->auth->audit->record(
+                'auth.csrf_failed',
+                $user->id,
+                $request->clientIp(),
+                $request->requestId(),
+                ['route' => $request->path()],
+            );
+            return Response::json(['error' => 'Invalid request.'], 419);
+        }
+        $plugin = $this->auth->plugins->find($pluginId);
+        if ($plugin === null || !$this->supportsApiTemplates($plugin)) {
+            return Response::json(['error' => 'That plugin does not expose editable API templates.'], 404);
+        }
+
+        $form = $request->form();
+        $slot = $form['slot'] ?? '';
+        $template = $form['template'] ?? '';
+        if (
+            !in_array($slot, ['html_list', 'html_detail', 'txt_list', 'txt_detail'], true)
+            || trim($template) === '' || strlen($template) > 60_000
+        ) {
+            return Response::json(['error' => 'Choose a valid non-empty template to preview.'], 422);
+        }
+        [$format] = explode('_', $slot, 2);
+        $binding = $plugin->manifest['api']['binding'] ?? $plugin->manifest['api']['resource'] ?? $plugin->id;
+        if (!is_string($binding)) {
+            $binding = $plugin->id;
+        }
+        try {
+            $renderer = new SafeTemplate();
+            $context = [$binding => $this->apiFields->sample($plugin)];
+            $output = $format === 'html'
+                ? $renderer->render($template, $context)
+                : $renderer->renderText($template, $context);
+        } catch (PluginException $exception) {
+            return Response::json(['error' => $exception->getMessage()], 422);
+        }
+
+        return $this->auth->sessions->withCookie(Response::json([
+            'format' => $format,
+            'output' => $output,
+        ])->withHeader('Cache-Control', 'no-store, private'), $session);
+    }
+
+    public function resetApiTemplates(Request $request, string $pluginId): Response
+    {
+        $context = $this->authorized($request, 'core.plugins.manage');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        if (!$this->validCsrf($session, $request->form()['_csrf'] ?? null)) {
+            return $this->csrfFailure($request, $session, $user, $request->path());
+        }
+        $plugin = $this->auth->plugins->find($pluginId);
+        if ($plugin === null || !$this->supportsApiTemplates($plugin)) {
+            return $this->indexError(
+                $request,
+                $session,
+                $user,
+                'That plugin does not expose editable API templates.',
+                404,
+            );
+        }
+        $this->apiTemplates->defaults($pluginId);
+        $this->apiTemplates->reset($pluginId);
+        $this->auth->audit->record(
+            'plugin.api_templates_reset',
+            $user->id,
+            $request->clientIp(),
+            $request->requestId(),
+            [],
+            'plugin',
+            $pluginId,
+        );
+
+        return $this->redirect($session, '/admin/plugins/' . $pluginId . '/api-templates?result=reset');
+    }
+
     private function changeState(Request $request, string $pluginId, bool $enable): Response
     {
         $context = $this->authorized($request, 'core.plugins.manage');
@@ -305,6 +492,44 @@ final class PluginManagementController
             return $this->indexError($request, $session, $user, $exception->getMessage(), 422);
         }
         return $this->redirect($session, '/admin/plugins?result=' . ($enable ? 'enabled' : 'disabled'));
+    }
+
+    private function supportsApiTemplates(PluginRecord $plugin): bool
+    {
+        $formats = $plugin->manifest['api']['formats'] ?? null;
+        return is_array($formats) && in_array('html', $formats, true) && in_array('txt', $formats, true);
+    }
+
+    /**
+     * @param array{html_list:string,html_detail:string,txt_list:string,txt_detail:string} $templates
+     */
+    private function apiTemplatePage(
+        Request $request,
+        SessionContext $session,
+        User $user,
+        PluginRecord $plugin,
+        array $templates,
+        ?string $success = null,
+        ?string $error = null,
+        int $status = 200,
+    ): Response {
+        $binding = $plugin->manifest['api']['binding'] ?? $plugin->manifest['api']['resource'] ?? $plugin->id;
+        return $this->page(
+            $request,
+            $session,
+            $user,
+            'Edit ' . $plugin->name . ' API Templates',
+            'admin/plugins/templates',
+            [
+                'plugin' => $plugin,
+                'binding' => is_string($binding) ? $binding : $plugin->id,
+                'fields' => $this->apiFields->fields($plugin),
+                'templates' => $templates,
+                'success' => $success,
+                'error' => $error,
+            ],
+            $status,
+        );
     }
 
     /** @return array{SessionContext, User}|Response */

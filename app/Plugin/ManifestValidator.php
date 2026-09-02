@@ -83,12 +83,17 @@ final class ManifestValidator
             $formats = is_array($api) ? ($api['formats'] ?? null) : null;
             if (
                 !is_array($api) || array_is_list($api)
-                || array_diff(array_keys($api), ['resource', 'formats', 'defaultPolicy']) !== []
+                || array_diff(array_keys($api), ['resource', 'binding', 'formats', 'defaultPolicy', 'fields']) !== []
                 || !is_string($api['resource'] ?? null)
                 || preg_match('/^[a-z][a-z0-9_-]{1,31}$/D', $api['resource']) !== 1
+                || (isset($api['binding']) && (
+                    !is_string($api['binding'])
+                    || preg_match('/^[a-z][a-zA-Z0-9_-]{1,31}$/D', $api['binding']) !== 1
+                ))
                 || !$this->validApiFormats($formats)
                 || !is_string($api['defaultPolicy'] ?? null)
                 || !in_array($api['defaultPolicy'], ['public', 'same-origin', 'authenticated'], true)
+                || (isset($api['fields']) && !$this->validApiFields($api['fields']))
             ) {
                 throw new PluginException('The plugin API metadata is invalid.');
             }
@@ -149,5 +154,36 @@ final class ManifestValidator
             }
         }
         return count(array_unique($formats)) === count($formats);
+    }
+
+    private function validApiFields(mixed $fields): bool
+    {
+        if (!is_array($fields) || array_is_list($fields) || count($fields) > 128) {
+            return false;
+        }
+        foreach ($fields as $path => $metadata) {
+            if (
+                !is_string($path)
+                || strlen($path) > 191 || substr_count($path, '.') > 7
+                || preg_match('/^[a-z][a-zA-Z0-9_]*(?:\.[a-z][a-zA-Z0-9_]*)*$/D', $path) !== 1
+                || !is_array($metadata) || array_is_list($metadata)
+                || array_diff(array_keys($metadata), ['type', 'label', 'description']) !== []
+                || !is_string($metadata['type'] ?? null)
+                || !in_array($metadata['type'], [
+                    'string', 'text', 'html', 'integer', 'number', 'boolean', 'datetime', 'url',
+                ], true)
+                || (isset($metadata['label']) && (
+                    !is_string($metadata['label']) || trim($metadata['label']) === ''
+                    || strlen($metadata['label']) > 64
+                ))
+                || (isset($metadata['description']) && (
+                    !is_string($metadata['description']) || strlen($metadata['description']) > 255
+                ))
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

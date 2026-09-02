@@ -72,6 +72,12 @@ use ReaCms\Plugin\PluginRecord;
                         </dl>
                         <?php if ($canManage) : ?>
                             <div class="button-row mt-5">
+                                <?php $apiFormats = $plugin->manifest['api']['formats'] ?? []; ?>
+                                <?php if (is_array($apiFormats) && in_array('html', $apiFormats, true) && in_array('txt', $apiFormats, true)) : ?>
+                                    <a class="button-secondary" href="/admin/plugins/<?= $escape($plugin->id) ?>/api-templates">
+                                        API templates
+                                    </a>
+                                <?php endif; ?>
                                 <?php if ($plugin->state === 'enabled') : ?>
                                     <form method="post" action="/admin/plugins/<?= $escape($plugin->id) ?>/disable">
                                         <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">

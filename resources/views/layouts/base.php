@@ -26,7 +26,7 @@ $canManagePlugins = $canManagePlugins ?? false;
     <meta name="color-scheme" content="light dark">
     <title><?= $escape($title) ?></title>
     <script src="/assets/theme.js?v=1"></script>
-    <link rel="stylesheet" href="/assets/app.css?v=5">
+    <link rel="stylesheet" href="/assets/app.css?v=6">
     <script src="/assets/htmx.min.js?v=4.0.0" defer></script>
     <script src="/assets/navigation.js?v=1" defer></script>
 </head>

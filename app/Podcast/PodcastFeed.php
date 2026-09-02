@@ -32,6 +32,11 @@ final class PodcastFeed
         public readonly ?int $lastHttpStatus = null,
         public readonly string $refreshStatus = 'current',
         public readonly ?string $contentHash = null,
+        public readonly string $refreshMode = PodcastSchedule::MODE_INTERVAL,
+        public readonly bool $scheduleEnabled = false,
+        public readonly string $scheduleTimezone = PodcastSchedule::APPLICATION_DEFAULT_TIMEZONE,
+        /** @var list<PodcastScheduleDay> */
+        public readonly array $scheduleDays = [],
     ) {
     }
 

@@ -6,7 +6,7 @@ namespace ReaCms\Podcast;
 
 use ReaCms\Api\Policy\OriginAllowlist;
 use ReaCms\Api\Query\ApiQuery;
-use ReaCms\Api\Serialization\SerializerRegistry;
+use ReaCms\Api\Template\PluginApiRenderer;
 use ReaCms\Auth\AuthServices;
 use ReaCms\Auth\SessionContext;
 use ReaCms\Auth\User;
@@ -22,6 +22,8 @@ use Throwable;
 
 final class PodcastController
 {
+    private readonly PodcastSchedule $schedule;
+
     public function __construct(
         private readonly PodcastRepository $repository,
         private readonly PodcastFeedSyncService $sync,
@@ -29,7 +31,11 @@ final class PodcastController
         private readonly OriginAllowlist $origins,
         private readonly AuthServices $auth,
         private readonly ViewRenderer $views,
+        private readonly PluginApiRenderer $api,
+        ?PodcastSchedule $schedule = null,
+        private readonly string $defaultScheduleTimezone = PodcastSchedule::APPLICATION_DEFAULT_TIMEZONE,
     ) {
+        $this->schedule = $schedule ?? new PodcastSchedule();
     }
 
     public function collection(Request $request, string $format): Response
@@ -40,7 +46,7 @@ final class PodcastController
         }
         $query = ApiQuery::fromArray($request->query(), [], ['publishedAt'], 100);
         $total = $this->repository->countEpisodes(null);
-        return $this->serialize($request, $format, [
+        return $this->serialize($request, $format, 'list', [
             'data' => array_map(
                 static fn (PodcastEpisode $episode): array => $episode->api(),
                 $this->repository->episodes(null, $query->perPage, ($query->page - 1) * $query->perPage),
@@ -62,7 +68,7 @@ final class PodcastController
         $feed = $this->repository->feedById($feed->id) ?? $feed;
         $query = ApiQuery::fromArray($request->query(), [], ['publishedAt'], 100);
         $total = $this->repository->countEpisodes($feed->id);
-        return $this->serialize($request, $format, [
+        return $this->serialize($request, $format, 'detail', [
             'data' => [
                 'podcast' => $feed->api(),
                 'episodes' => array_map(
@@ -92,7 +98,7 @@ final class PodcastController
         if ($item === null) {
             throw new RouteNotFound();
         }
-        return $this->serialize($request, $format, ['data' => $item->api()]);
+        return $this->serialize($request, $format, 'detail', ['data' => $item->api()]);
     }
 
     public function index(Request $request): Response
@@ -101,6 +107,7 @@ final class PodcastController
             'feeds' => $this->repository->feeds(),
             'settings' => $this->repository->settings(),
             'message' => $this->queryString($request, 'message'),
+            'schedule' => $this->schedule,
         ]);
     }
 
@@ -114,7 +121,12 @@ final class PodcastController
             $request,
             $feed === null ? 'Add Podcast Feed' : 'Edit Podcast Feed',
             'cms/podcast/editor',
-            ['feed' => $feed],
+            [
+                'feed' => $feed,
+                'schedule' => $this->schedule,
+                'timezones' => $this->schedule->timezoneIdentifiers(),
+                'defaultScheduleTimezone' => $this->defaultScheduleTimezone,
+            ],
         );
     }
 
@@ -130,7 +142,13 @@ final class PodcastController
         }
         $form = $request->form();
         $rssUrl = trim($form['rss_url'] ?? '');
-        $interval = $this->nullableInterval($form['refresh_interval'] ?? '');
+        $intervalInput = $form['refresh_interval'] ?? '';
+        if (!$this->validOptionalInteger($intervalInput, 1, 1440)) {
+            return $this->failure($request, $session, $user, 422, 'Invalid refresh interval', 'cms/message', [
+                'message' => 'The refresh interval must be between 1 and 1440 minutes.',
+            ]);
+        }
+        $interval = $this->nullableInterval($intervalInput);
         try {
             $slug = (new Slugger())->slug($form['slug'] ?? '');
         } catch (Throwable) {
@@ -146,10 +164,29 @@ final class PodcastController
             ]);
         }
         $automatic = isset($form['automatic_refresh']);
+        try {
+            [$refreshMode, $scheduleEnabled, $scheduleTimezone, $scheduleDays] = $this->scheduleForm(
+                $form,
+                $id === null ? null : $this->repository->feedById($id),
+            );
+        } catch (PodcastException $exception) {
+            return $this->failure($request, $session, $user, 422, 'Invalid RSS update schedule', 'cms/message', [
+                'message' => $exception->getMessage(),
+            ]);
+        }
         $created = false;
         try {
             if ($id === null) {
-                $feed = $this->repository->createFeed($slug, $rssUrl, $interval, $automatic);
+                $feed = $this->repository->createFeed(
+                    $slug,
+                    $rssUrl,
+                    $interval,
+                    $automatic,
+                    $refreshMode,
+                    $scheduleEnabled,
+                    $scheduleTimezone,
+                    $scheduleDays,
+                );
                 $created = true;
             } else {
                 $previous = $this->repository->feedById($id);
@@ -163,6 +200,10 @@ final class PodcastController
                     isset($form['enabled']),
                     $interval,
                     $automatic,
+                    $refreshMode,
+                    $scheduleEnabled,
+                    $scheduleTimezone,
+                    $scheduleDays,
                 );
                 $feed = $this->repository->feedById($id) ?? $previous;
             }
@@ -233,7 +274,7 @@ final class PodcastController
         }
         $form = $request->form();
         $settings = new PodcastSettings(
-            $this->boundedInteger($form['default_refresh_interval'] ?? '', 1, 1440, 10),
+            $this->boundedInteger($form['default_refresh_interval'] ?? '', 1, 1440, 30),
             isset($form['automatic_refresh']),
             $this->boundedInteger($form['request_timeout'] ?? '', 1, 60, 10),
             $this->boundedInteger($form['maximum_download_size'] ?? '', 65_536, 52_428_800, 5_242_880),
@@ -265,13 +306,12 @@ final class PodcastController
     }
 
     /** @param array<string, mixed> $document */
-    private function serialize(Request $request, string $format, array $document): Response
+    private function serialize(Request $request, string $format, string $mode, array $document): Response
     {
-        $serializer = (new SerializerRegistry())->get($format);
-        if ($serializer === null) {
+        $response = $this->api->render('podcast', 'podcast', $format, $mode, $document);
+        if ($response === null) {
             return Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406);
         }
-        $response = $serializer->serialize($document);
         $origin = $request->header('origin');
         return $origin === null ? $response : $response->withHeader('Access-Control-Allow-Origin', $origin)
             ->withHeader('Vary', 'Origin')->withHeader('Cross-Origin-Resource-Policy', 'same-origin');
@@ -363,13 +403,56 @@ final class PodcastController
         if (trim($value) === '') {
             return null;
         }
-        return $this->boundedInteger($value, 1, 1440, 10);
+        return $this->boundedInteger($value, 1, 1440, 30);
     }
 
     private function boundedInteger(string $value, int $minimum, int $maximum, int $default): int
     {
         $number = filter_var($value, FILTER_VALIDATE_INT);
         return is_int($number) && $number >= $minimum && $number <= $maximum ? $number : $default;
+    }
+
+    private function validOptionalInteger(string $value, int $minimum, int $maximum): bool
+    {
+        if (trim($value) === '') {
+            return true;
+        }
+        $number = filter_var($value, FILTER_VALIDATE_INT);
+        return is_int($number) && $number >= $minimum && $number <= $maximum;
+    }
+
+    /**
+     * @param array<string, string> $form
+     * @return array{string, bool, string, list<PodcastScheduleDay>}
+     */
+    private function scheduleForm(array $form, ?PodcastFeed $existing): array
+    {
+        $mode = $form['refresh_mode'] ?? PodcastSchedule::MODE_INTERVAL;
+        if (!in_array($mode, [PodcastSchedule::MODE_INTERVAL, PodcastSchedule::MODE_SCHEDULE], true)) {
+            throw new PodcastException('Choose either interval or weekly schedule update mode.');
+        }
+        $savedTimezone = $existing === null ? $this->defaultScheduleTimezone : $existing->scheduleTimezone;
+        $timezone = trim($form['schedule_timezone'] ?? $savedTimezone);
+        if (!$this->schedule->validTimezone($timezone)) {
+            throw new PodcastException('Choose a valid IANA timezone for scheduled RSS updates.');
+        }
+        $days = [];
+        foreach (PodcastScheduleDay::NAMES as $dayNumber => $dayName) {
+            if (!isset($form['schedule_day_' . $dayNumber])) {
+                continue;
+            }
+            $time = trim($form['schedule_time_' . $dayNumber] ?? '');
+            try {
+                $days[] = new PodcastScheduleDay($dayNumber, $time);
+            } catch (PodcastException $exception) {
+                throw new PodcastException($dayName . ' must have a valid update time.', previous: $exception);
+            }
+        }
+        $enabled = isset($form['schedule_enabled']);
+        if ($mode === PodcastSchedule::MODE_SCHEDULE && $enabled && $days === []) {
+            throw new PodcastException('Select at least one day before enabling scheduled updates.');
+        }
+        return [$mode, $enabled, $timezone, $days];
     }
 
     private function queryString(Request $request, string $name): string

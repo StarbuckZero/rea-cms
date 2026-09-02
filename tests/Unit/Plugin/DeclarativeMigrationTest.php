@@ -38,6 +38,24 @@ final class DeclarativeMigrationTest extends TestCase
         ], JSON_THROW_ON_ERROR));
     }
 
+    public function testUniqueIndexesCanEnforcePluginOwnedNaturalKeys(): void
+    {
+        $sql = (new DeclarativeMigration())->compile('notes', $this->manifest(), json_encode([
+            'operations' => [[
+                'action' => 'create_index',
+                'table' => 'plugin_notes_entries',
+                'name' => 'notes_title_unique',
+                'columns' => ['title'],
+                'unique' => true,
+            ]],
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertSame(
+            'CREATE UNIQUE INDEX `notes_title_unique` ON `plugin_notes_entries` (`title`)',
+            $sql[0],
+        );
+    }
+
     private function manifest(): \ReaCms\Plugin\Manifest
     {
         return (new ManifestValidator())->validate(json_encode([

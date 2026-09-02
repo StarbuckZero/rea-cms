@@ -102,9 +102,11 @@ final class DeclarativeMigration
     {
         $name = $operation['name'] ?? null;
         $columns = $operation['columns'] ?? null;
+        $uniqueOption = $operation['unique'] ?? false;
         if (
             !is_string($name) || preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $name) !== 1
             || !is_array($columns) || !array_is_list($columns) || $columns === []
+            || !is_bool($uniqueOption)
         ) {
             throw new PluginException('A migration index is invalid.');
         }
@@ -113,8 +115,10 @@ final class DeclarativeMigration
                 throw new PluginException('A migration index column is invalid.');
             }
         }
+        $unique = $uniqueOption ? 'UNIQUE ' : '';
         return sprintf(
-            'CREATE INDEX `%s` ON `%s` (%s)',
+            'CREATE %sINDEX `%s` ON `%s` (%s)',
+            $unique,
             $name,
             $table,
             implode(', ', array_map(static fn (string $column): string => '`' . $column . '`', $columns)),

@@ -81,6 +81,15 @@ It adds `/cms/podcast`, cached podcast APIs under `/api/v1/podcast`, and the
 short-lived `php bin/refresh-podcast-feeds.php` cron command. See
 [plugins/podcast/README.md](plugins/podcast/README.md) for endpoint details.
 
+The bundled Text Block plugin can be installed and enabled with:
+
+```bash
+php bin/install-reference-text-block.php --enable
+```
+
+It adds reusable content management under `/cms/text-block` and JSON, HTML,
+and TXT APIs under `/api/v1/text-block` with lookup by ID or URL-safe name.
+
 The default API policy requires an exact configured `Origin` header. For
 example:
 
@@ -92,6 +101,17 @@ Additional exact origins can be comma-separated in `API_ALLOWED_ORIGINS`.
 Trusted reverse-proxy networks can be comma-separated in `TRUSTED_PROXIES`;
 forwarded client addresses are ignored unless the immediate peer matches one
 of those networks.
+
+Plugin JSON APIs keep their structured documents. Plugin HTML and TXT APIs use
+four packaged defaults under `templates/api`: `list.html`, `detail.html`,
+`list.txt`, and `detail.txt`. Administrators with plugin-management permission
+can override them from **Plugin Management → API templates**. Bindings use the
+plugin API resource name, for example `{blog.title}`. HTML values are escaped
+unless `| sanitized_html` is explicitly requested; TXT values are converted
+from HTML to normalized US-ASCII plain text. Plugins can declare public API
+field type, label, and description metadata under `api.fields`; the editor uses
+it to provide cursor-aware field insertion and generated-data previews. Legacy
+plugins without that metadata fall back to their declarative field schema.
 
 Create a named, scoped API token after migrating with:
 

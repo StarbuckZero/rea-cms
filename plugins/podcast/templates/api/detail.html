@@ -1,0 +1,6 @@
+<article>
+    <h1>{podcast.title}</h1>
+    <p>{podcast.description}</p>
+    {podcast.content | sanitized_html}
+    <a href="{podcast.link}">Open podcast</a>
+</article>

@@ -1,0 +1,9 @@
+{
+  "resource": "blocks",
+  "table": "plugin_text_block_blocks",
+  "required": ["name", "content"],
+  "fields": {
+    "name": "string",
+    "content": "html"
+  }
+}

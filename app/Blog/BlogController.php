@@ -6,7 +6,7 @@ namespace ReaCms\Blog;
 
 use ReaCms\Api\Policy\OriginAllowlist;
 use ReaCms\Api\Query\ApiQuery;
-use ReaCms\Api\Serialization\SerializerRegistry;
+use ReaCms\Api\Template\PluginApiRenderer;
 use ReaCms\Core\Http\Request;
 use ReaCms\Core\Http\Response;
 use ReaCms\Core\Routing\RouteNotFound;
@@ -20,6 +20,7 @@ final class BlogController
         private readonly PluginRouteGate $plugins,
         private readonly OriginAllowlist $origins,
         private readonly Clock $clock,
+        private readonly PluginApiRenderer $api,
     ) {
     }
 
@@ -27,10 +28,6 @@ final class BlogController
     {
         $this->requireEnabled();
         $this->requireApiOrigin($request);
-        $serializer = (new SerializerRegistry())->get($format);
-        if ($serializer === null) {
-            return Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406);
-        }
         $query = ApiQuery::fromArray($request->query(), [], ['publishedAt'], 100);
         $locale = $this->locale($request);
         $total = $this->posts->countPublished($locale, $this->clock->now());
@@ -40,27 +37,29 @@ final class BlogController
             $query->perPage,
             ($query->page - 1) * $query->perPage,
         );
-        return $this->cors($request, $serializer->serialize([
+        $response = $this->api->render('blog', 'blog', $format, 'list', [
             'data' => array_map(static fn (BlogPost $post): array => $post->api(), $posts),
             'meta' => ['page' => $query->page, 'perPage' => $query->perPage, 'total' => $total,
                 'totalPages' => (int) ceil($total / $query->perPage)],
             'links' => ['self' => sprintf('/api/v1/blog.%s?page=%d', $format, $query->page)],
-        ]));
+        ]);
+        return $response === null
+            ? Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406)
+            : $this->cors($request, $response);
     }
 
     public function item(Request $request, int $id, string $format): Response
     {
         $this->requireEnabled();
         $this->requireApiOrigin($request);
-        $serializer = (new SerializerRegistry())->get($format);
-        if ($serializer === null) {
-            return Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406);
-        }
         $post = $this->posts->findPublishedById($id, $this->locale($request), $this->clock->now());
         if ($post === null) {
             throw new RouteNotFound();
         }
-        return $this->cors($request, $serializer->serialize(['data' => $post->api()]));
+        $response = $this->api->render('blog', 'blog', $format, 'detail', ['data' => $post->api()]);
+        return $response === null
+            ? Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406)
+            : $this->cors($request, $response);
     }
 
     public function publicIndex(Request $request): Response
@@ -96,7 +95,7 @@ final class BlogController
             . htmlspecialchars($post->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</title><link rel="stylesheet" href="/assets/app.css?v=2"></head><body class="bg-surface text-primary">'
             . '<a class="skip-link" href="#main-content">Skip to main content</a>'
-            . '<main id="main-content" class="page-shell py-12"><article><h1 class="text-4xl font-bold">'
+            . '<main id="main-content" class="page-shell py-12"><article class="prose-content"><h1>'
             . htmlspecialchars($post->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</h1>' . \ReaCms\Plugin\SafeHtml::sanitize($post->content)->value
             . '</article></main></body></html>');

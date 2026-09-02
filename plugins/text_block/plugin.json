@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "text_block",
+  "name": "Text Blocks",
+  "version": "1.0.0",
+  "reaCmsVersion": "^1.0",
+  "description": "Reusable text content for websites and front-end applications.",
+  "author": "Rea CMS",
+  "navigation": {"label": "Text Blocks", "path": "/cms/text-block"},
+  "tables": ["plugin_text_block_blocks"],
+  "permissions": [
+    "text_block.blocks.view",
+    "text_block.blocks.create",
+    "text_block.blocks.update",
+    "text_block.blocks.delete"
+  ],
+  "api": {
+    "resource": "text-block",
+    "binding": "textBlock",
+    "formats": ["json", "html", "txt"],
+    "defaultPolicy": "same-origin",
+    "fields": {
+      "id": {"type":"integer","label":"ID","description":"Unique internal text block identifier."},
+      "name": {"type":"string","label":"Name","description":"Unique URL-safe API name for the text block."},
+      "content": {"type":"html","label":"Content","description":"Sanitized reusable text or rich-text content."},
+      "createdAt": {"type":"datetime","label":"Created date","description":"Creation timestamp in ISO 8601 format."},
+      "updatedAt": {"type":"datetime","label":"Updated date","description":"Last-update timestamp in ISO 8601 format."}
+    }
+  }
+}

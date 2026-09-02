@@ -1,0 +1,4 @@
+Title: {gallery.title}
+ID: {gallery.id}
+Caption: {gallery.caption}
+Media: {gallery.media}

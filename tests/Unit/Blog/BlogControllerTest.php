@@ -7,6 +7,7 @@ namespace ReaCms\Tests\Unit\Blog;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use ReaCms\Api\Policy\OriginAllowlist;
+use ReaCms\Api\Template\PluginApiRenderer;
 use ReaCms\Blog\BlogController;
 use ReaCms\Blog\BlogPost;
 use ReaCms\Blog\BlogRepository;
@@ -16,6 +17,7 @@ use ReaCms\Plugin\PluginRecord;
 use ReaCms\Plugin\PluginRouteGate;
 use ReaCms\Tests\Support\FrozenClock;
 use ReaCms\Tests\Support\InMemoryPluginRegistry;
+use ReaCms\Tests\Support\InMemoryPluginApiTemplateRepository;
 
 final class BlogControllerTest extends TestCase
 {
@@ -80,7 +82,8 @@ final class BlogControllerTest extends TestCase
             $repository,
             new PluginRouteGate($registry),
             new OriginAllowlist(['http://rea-cms.test']),
-            new FrozenClock(new DateTimeImmutable('2026-08-29T12:00:00+00:00'))
+            new FrozenClock(new DateTimeImmutable('2026-08-29T12:00:00+00:00')),
+            new PluginApiRenderer(new InMemoryPluginApiTemplateRepository()),
         );
     }
 

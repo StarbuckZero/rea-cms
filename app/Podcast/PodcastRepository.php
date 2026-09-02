@@ -15,13 +15,19 @@ interface PodcastRepository
 
     public function feedBySlug(string $slug): ?PodcastFeed;
 
+    /** @param list<PodcastScheduleDay> $scheduleDays */
     public function createFeed(
         string $slug,
         string $rssUrl,
         ?int $refreshIntervalMinutes,
         bool $automaticRefresh,
+        string $refreshMode,
+        bool $scheduleEnabled,
+        string $scheduleTimezone,
+        array $scheduleDays,
     ): PodcastFeed;
 
+    /** @param list<PodcastScheduleDay> $scheduleDays */
     public function updateFeed(
         int $id,
         string $slug,
@@ -29,6 +35,10 @@ interface PodcastRepository
         bool $enabled,
         ?int $refreshIntervalMinutes,
         bool $automaticRefresh,
+        string $refreshMode,
+        bool $scheduleEnabled,
+        string $scheduleTimezone,
+        array $scheduleDays,
     ): void;
 
     public function deleteFeed(int $id): void;
@@ -45,6 +55,8 @@ interface PodcastRepository
     public function episode(int $feedId, string $episode): ?PodcastEpisode;
 
     public function acquireRefreshLock(int $feedId, DateTimeImmutable $now, int $seconds = 120): ?string;
+
+    public function rescheduleFeed(int $feedId, DateTimeImmutable $nextRefreshAt): void;
 
     public function storeUpdatedFeed(
         PodcastFeed $feed,

@@ -386,19 +386,24 @@ Use a restricted template syntax with automatic escaping:
 
 ```html
 <article>
-  <h2>{{ post.title }}</h2>
-  <p>{{ post.excerpt }}</p>
-  <a href="{{ post.url }}">Read more</a>
+  <h2>{post.title}</h2>
+  <p>{post.excerpt}</p>
+  <a href="{post.url}">Read more</a>
 </article>
 ```
 
 Sanitized rich text requires an explicit safe operation such as:
 
 ```html
-{{ post.content | sanitized_html }}
+{post.content | sanitized_html}
 ```
 
 Templates cannot execute PHP, SQL, shell commands, filesystem reads, environment reads, arbitrary functions, or cross-plugin data access.
+
+Plugins may describe public template fields under `api.fields` with a type,
+label, and description. The template editor uses this plugin-owned metadata to
+list available bindings, insert them at the active cursor, and build safe sample
+previews without hard-coding fields for a specific plugin.
 
 ### Plugin table rules
 

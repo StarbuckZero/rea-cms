@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ReaCms\Podcast;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 use Throwable;
 
@@ -35,45 +36,66 @@ final class PdoPodcastRepository implements PodcastRepository
         return $this->oneFeed('slug = :value', $slug);
     }
 
+    /** @param list<PodcastScheduleDay> $scheduleDays */
     public function createFeed(
         string $slug,
         string $rssUrl,
         ?int $refreshIntervalMinutes,
         bool $automaticRefresh,
+        string $refreshMode,
+        bool $scheduleEnabled,
+        string $scheduleTimezone,
+        array $scheduleDays,
     ): PodcastFeed {
         if ($this->feedBySlug($slug) !== null) {
             throw new PodcastException('A podcast feed already uses that slug.');
         }
+        $this->validateScheduleDays($scheduleDays);
         $now = $this->format(new DateTimeImmutable('now'));
-        $statement = $this->pdo->prepare(
-            'INSERT INTO `plugin_podcast_feeds` '
-            . '(slug, rss_url, enabled, refresh_interval, automatic_refresh, title, description, link, language, '
-            . 'author, image_url, explicit, refresh_status, created_at, updated_at) VALUES '
-            . '(:slug, :rss_url, 1, :refresh_interval, :automatic_refresh, :title, :description, :link, :language, '
-            . ':author, :image_url, 0, :refresh_status, :created_at, :updated_at)',
-        );
-        $statement->execute([
-            'slug' => $slug,
-            'rss_url' => $rssUrl,
-            'refresh_interval' => $refreshIntervalMinutes,
-            'automatic_refresh' => $automaticRefresh ? 1 : 0,
-            'title' => '',
-            'description' => '',
-            'link' => '',
-            'language' => '',
-            'author' => '',
-            'image_url' => '',
-            'refresh_status' => 'current',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        $feed = $this->feedById((int) $this->pdo->lastInsertId());
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO `plugin_podcast_feeds` '
+                . '(slug, rss_url, enabled, refresh_interval, automatic_refresh, refresh_mode, schedule_enabled, '
+                . 'schedule_timezone, title, description, link, language, author, image_url, explicit, '
+                . 'refresh_status, created_at, updated_at) VALUES '
+                . '(:slug, :rss_url, 1, :refresh_interval, :automatic_refresh, :refresh_mode, :schedule_enabled, '
+                . ':schedule_timezone, :title, :description, :link, :language, :author, :image_url, 0, '
+                . ':refresh_status, :created_at, :updated_at)',
+            );
+            $statement->execute([
+                'slug' => $slug,
+                'rss_url' => $rssUrl,
+                'refresh_interval' => $refreshIntervalMinutes,
+                'automatic_refresh' => $automaticRefresh ? 1 : 0,
+                'refresh_mode' => $refreshMode,
+                'schedule_enabled' => $scheduleEnabled ? 1 : 0,
+                'schedule_timezone' => $scheduleTimezone,
+                'title' => '',
+                'description' => '',
+                'link' => '',
+                'language' => '',
+                'author' => '',
+                'image_url' => '',
+                'refresh_status' => 'current',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            $id = (int) $this->pdo->lastInsertId();
+            $this->replaceScheduleDays($id, $scheduleDays);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->rollBack();
+            throw $exception;
+        }
+        $feed = $this->feedById($id);
         if ($feed === null) {
             throw new PodcastException('The podcast feed could not be created.');
         }
         return $feed;
     }
 
+    /** @param list<PodcastScheduleDay> $scheduleDays */
     public function updateFeed(
         int $id,
         string $slug,
@@ -81,37 +103,57 @@ final class PdoPodcastRepository implements PodcastRepository
         bool $enabled,
         ?int $refreshIntervalMinutes,
         bool $automaticRefresh,
+        string $refreshMode,
+        bool $scheduleEnabled,
+        string $scheduleTimezone,
+        array $scheduleDays,
     ): void {
         $existing = $this->feedBySlug($slug);
         if ($existing !== null && $existing->id !== $id) {
             throw new PodcastException('A podcast feed already uses that slug.');
         }
+        $this->validateScheduleDays($scheduleDays);
         $current = $this->feedById($id);
         $sourceChanged = $current !== null && $current->rssUrl !== $rssUrl;
-        $statement = $this->pdo->prepare(
-            'UPDATE `plugin_podcast_feeds` SET slug = :slug, rss_url = :rss_url, enabled = :enabled, '
-            . 'refresh_interval = :refresh_interval, automatic_refresh = :automatic_refresh, '
-            . 'next_refresh_at = NULL, etag = :etag, last_modified = :last_modified, '
-            . 'content_hash = :content_hash, updated_at = :updated_at WHERE id = :id',
-        );
-        $statement->execute([
-            'slug' => $slug,
-            'rss_url' => $rssUrl,
-            'enabled' => $enabled ? 1 : 0,
-            'refresh_interval' => $refreshIntervalMinutes,
-            'automatic_refresh' => $automaticRefresh ? 1 : 0,
-            'etag' => $sourceChanged ? null : $current?->etag,
-            'last_modified' => $sourceChanged ? null : $current?->lastModified,
-            'content_hash' => $sourceChanged ? null : $current?->contentHash,
-            'updated_at' => $this->format(new DateTimeImmutable('now')),
-            'id' => $id,
-        ]);
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->pdo->prepare(
+                'UPDATE `plugin_podcast_feeds` SET slug = :slug, rss_url = :rss_url, enabled = :enabled, '
+                . 'refresh_interval = :refresh_interval, automatic_refresh = :automatic_refresh, '
+                . 'refresh_mode = :refresh_mode, schedule_enabled = :schedule_enabled, '
+                . 'schedule_timezone = :schedule_timezone, next_refresh_at = NULL, etag = :etag, '
+                . 'last_modified = :last_modified, content_hash = :content_hash, updated_at = :updated_at '
+                . 'WHERE id = :id',
+            );
+            $statement->execute([
+                'slug' => $slug,
+                'rss_url' => $rssUrl,
+                'enabled' => $enabled ? 1 : 0,
+                'refresh_interval' => $refreshIntervalMinutes,
+                'automatic_refresh' => $automaticRefresh ? 1 : 0,
+                'refresh_mode' => $refreshMode,
+                'schedule_enabled' => $scheduleEnabled ? 1 : 0,
+                'schedule_timezone' => $scheduleTimezone,
+                'etag' => $sourceChanged ? null : $current?->etag,
+                'last_modified' => $sourceChanged ? null : $current?->lastModified,
+                'content_hash' => $sourceChanged ? null : $current?->contentHash,
+                'updated_at' => $this->format(new DateTimeImmutable('now')),
+                'id' => $id,
+            ]);
+            $this->replaceScheduleDays($id, $scheduleDays);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            $this->rollBack();
+            throw $exception;
+        }
     }
 
     public function deleteFeed(int $id): void
     {
         $this->pdo->beginTransaction();
         try {
+            $schedule = $this->pdo->prepare('DELETE FROM `plugin_podcast_schedule_days` WHERE feed_id = :id');
+            $schedule->execute(['id' => $id]);
             $episodes = $this->pdo->prepare('DELETE FROM `plugin_podcast_episodes` WHERE feed_id = :id');
             $episodes->execute(['id' => $id]);
             $feed = $this->pdo->prepare('DELETE FROM `plugin_podcast_feeds` WHERE id = :id');
@@ -135,7 +177,7 @@ final class PdoPodcastRepository implements PodcastRepository
             }
         }
         return new PodcastSettings(
-            $this->boundedInt($values['default_refresh_interval'] ?? null, 1, 1440, 10),
+            $this->boundedInt($values['default_refresh_interval'] ?? null, 1, 1440, 30),
             ($values['automatic_refresh'] ?? '1') === '1',
             $this->boundedInt($values['request_timeout'] ?? null, 1, 60, 10),
             $this->boundedInt($values['maximum_download_size'] ?? null, 65_536, 52_428_800, 5_242_880),
@@ -228,6 +270,18 @@ final class PdoPodcastRepository implements PodcastRepository
             'now' => $this->format($now),
         ]);
         return $statement->rowCount() === 1 ? $token : null;
+    }
+
+    public function rescheduleFeed(int $feedId, DateTimeImmutable $nextRefreshAt): void
+    {
+        $statement = $this->pdo->prepare(
+            'UPDATE `plugin_podcast_feeds` SET next_refresh_at = :next_refresh, updated_at = :updated WHERE id = :id',
+        );
+        $statement->execute([
+            'next_refresh' => $this->format($nextRefreshAt),
+            'updated' => $this->format(new DateTimeImmutable('now', new DateTimeZone('UTC'))),
+            'id' => $feedId,
+        ]);
     }
 
     public function storeUpdatedFeed(
@@ -403,6 +457,14 @@ final class PdoPodcastRepository implements PodcastRepository
             $row['last_http_status'] === null ? null : (int) $row['last_http_status'],
             (string) $row['refresh_status'],
             is_string($row['content_hash']) ? $row['content_hash'] : null,
+            is_string($row['refresh_mode'] ?? null)
+                ? $row['refresh_mode']
+                : PodcastSchedule::MODE_INTERVAL,
+            (bool) ($row['schedule_enabled'] ?? false),
+            is_string($row['schedule_timezone'] ?? null)
+                ? $row['schedule_timezone']
+                : PodcastSchedule::APPLICATION_DEFAULT_TIMEZONE,
+            $this->scheduleDays((int) $row['id']),
         );
     }
 
@@ -433,18 +495,67 @@ final class PdoPodcastRepository implements PodcastRepository
 
     private function date(mixed $value): ?DateTimeImmutable
     {
-        return is_string($value) && $value !== '' ? new DateTimeImmutable($value) : null;
+        return is_string($value) && $value !== ''
+            ? new DateTimeImmutable($value, new DateTimeZone('UTC'))
+            : null;
     }
 
     private function format(DateTimeImmutable $date): string
     {
-        return $date->format('Y-m-d H:i:s.u');
+        return $date->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.u');
     }
 
     private function boundedInt(?string $value, int $minimum, int $maximum, int $default): int
     {
         $number = filter_var($value, FILTER_VALIDATE_INT);
         return is_int($number) && $number >= $minimum && $number <= $maximum ? $number : $default;
+    }
+
+    /** @return list<PodcastScheduleDay> */
+    private function scheduleDays(int $feedId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT day_of_week, local_time FROM `plugin_podcast_schedule_days` '
+            . 'WHERE feed_id = :feed_id ORDER BY day_of_week',
+        );
+        $statement->execute(['feed_id' => $feedId]);
+        $days = [];
+        foreach ($statement->fetchAll() as $row) {
+            if (is_array($row)) {
+                $days[] = new PodcastScheduleDay((int) $row['day_of_week'], (string) $row['local_time']);
+            }
+        }
+        return $days;
+    }
+
+    /** @param list<PodcastScheduleDay> $days */
+    private function replaceScheduleDays(int $feedId, array $days): void
+    {
+        $delete = $this->pdo->prepare('DELETE FROM `plugin_podcast_schedule_days` WHERE feed_id = :feed_id');
+        $delete->execute(['feed_id' => $feedId]);
+        $insert = $this->pdo->prepare(
+            'INSERT INTO `plugin_podcast_schedule_days` (feed_id, day_of_week, local_time) '
+            . 'VALUES (:feed_id, :day_of_week, :local_time)',
+        );
+        foreach ($days as $day) {
+            $insert->execute([
+                'feed_id' => $feedId,
+                'day_of_week' => $day->dayOfWeek,
+                'local_time' => $day->localTime,
+            ]);
+        }
+    }
+
+    /** @param list<PodcastScheduleDay> $days */
+    private function validateScheduleDays(array $days): void
+    {
+        $seen = [];
+        foreach ($days as $day) {
+            if (!$day instanceof PodcastScheduleDay || isset($seen[$day->dayOfWeek])) {
+                throw new PodcastException('A weekday can appear only once in an RSS update schedule.');
+            }
+            $seen[$day->dayOfWeek] = true;
+        }
     }
 
     private function rollBack(): void
