@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace ReaCms\Cms;
 
 use PDO;
+use PDOException;
+use ReaCms\Media\MediaDeletion;
+use ReaCms\Media\MediaUsage;
 use RuntimeException;
 
-final class PdoCmsRepository
+final class PdoCmsRepository implements MediaUsage
 {
     private readonly string $media;
     private readonly string $usage;
+    private readonly string $variants;
 
     public function __construct(private readonly PDO $pdo, string $prefix = 'rea_')
     {
@@ -19,6 +23,7 @@ final class PdoCmsRepository
         }
         $this->media = $prefix . 'media';
         $this->usage = $prefix . 'media_usage';
+        $this->variants = $prefix . 'media_variants';
     }
 
     /** @return list<array<string, mixed>> */
@@ -243,6 +248,68 @@ final class PdoCmsRepository
         return $this->row('SELECT id, stored_name, original_name, mime_type, visibility, '
             . 'alt_text, caption, description '
             . 'FROM `' . $this->media . '` WHERE id=:id', ['id' => $id]);
+    }
+
+    public function count(int $mediaId): int
+    {
+        $usage = $this->row(
+            'SELECT COUNT(*) AS total FROM `' . $this->usage . '` WHERE media_id=:id',
+            ['id' => $mediaId]
+        );
+        $count = (int) ($usage['total'] ?? 0);
+        // Older blog posts do not have entries in media_usage.
+        try {
+            $posts = $this->rows(
+                'SELECT featured_media_id, content FROM `plugin_blog_posts` '
+                . 'WHERE featured_media_id=:id OR content LIKE :path',
+                ['id' => $mediaId, 'path' => '%/media/' . $mediaId . '%']
+            );
+            foreach ($posts as $post) {
+                if (
+                    (int) ($post['featured_media_id'] ?? 0) === $mediaId
+                    || preg_match('~/media/' . $mediaId . '(?![0-9])~', (string) $post['content']) === 1
+                ) {
+                    $count++;
+                }
+            }
+        } catch (PDOException $exception) {
+            // Blog is optional; only ignore a missing plugin table.
+            if ($exception->getCode() !== '42S02') {
+                throw $exception;
+            }
+        }
+        return $count;
+    }
+
+    /** @param callable(list<string>): void $removeFiles */
+    public function deleteMedia(int $id, callable $removeFiles): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->pdo->prepare('SELECT stored_name FROM `' . $this->media . '` '
+                . 'WHERE id=:id FOR UPDATE');
+            $statement->execute(['id' => $id]);
+            $medium = $statement->fetch(PDO::FETCH_ASSOC);
+            if (is_array($medium)) {
+                (new MediaDeletion($this))->delete($id, function (int $mediaId) use ($medium, $removeFiles): void {
+                    $variants = $this->rows(
+                        'SELECT stored_name FROM `' . $this->variants . '` WHERE media_id=:id',
+                        ['id' => $mediaId]
+                    );
+                    $names = [(string) $medium['stored_name']];
+                    foreach ($variants as $variant) {
+                        $names[] = (string) $variant['stored_name'];
+                    }
+                    $delete = $this->pdo->prepare('DELETE FROM `' . $this->media . '` WHERE id=:id');
+                    $delete->execute(['id' => $mediaId]);
+                    $removeFiles(array_values(array_unique($names)));
+                });
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $exception) {
+            $this->pdo->rollBack();
+            throw $exception;
+        }
     }
 
     /** @param array{storedName:string,mime:string,size:int,hash:string,originalName:string} $file */

@@ -366,7 +366,12 @@ final class CmsController
 
     public function mediaIndex(Request $request): Response
     {
-        return $this->page($request, 'media', 'Media', 'cms/media/index', ['media' => $this->contents->media()]);
+        return $this->page($request, 'media', 'Media', 'cms/media/index', [
+            'media' => $this->contents->media(),
+            'uploadFailed' => ($request->query()['error'] ?? '') === 'upload',
+            'deleteFailed' => ($request->query()['error'] ?? '') === 'delete',
+            'deleted' => ($request->query()['deleted'] ?? '') === '1',
+        ]);
     }
 
     public function uploadMedia(Request $request): Response
@@ -380,20 +385,82 @@ final class CmsController
         if (!$this->auth->csrf->validate($session->token, $form['_csrf'] ?? null)) {
             return $this->failure($request, $session, $user, 419, 'Invalid request', 'errors/csrf');
         }
-        $file = $_FILES['media'] ?? $_FILES['image'] ?? null;
-        if (
-            !is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
-            || !is_string($file['tmp_name'] ?? null) || !is_string($file['name'] ?? null)
-        ) {
-            return Response::redirect('/cms/media?error=upload');
+        $upload = $_FILES['media'] ?? $_FILES['image'] ?? [];
+        $files = [];
+        if (is_array($upload) && is_array($upload['name'] ?? null)) {
+            foreach ($upload['name'] as $key => $name) {
+                $files[] = [
+                    'name' => $name,
+                    'tmp_name' => $upload['tmp_name'][$key] ?? null,
+                    'error' => $upload['error'][$key] ?? UPLOAD_ERR_NO_FILE,
+                ];
+            }
+        } else {
+            $files[] = $upload;
         }
+        $failed = $files === [];
+        $ingestor = new MediaIngestor($this->uploadRoot);
+        foreach ($files as $file) {
+            if (
+                !is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+                || !is_string($file['tmp_name'] ?? null) || !is_string($file['name'] ?? null)
+            ) {
+                $failed = true;
+                continue;
+            }
+            try {
+                $stored = $ingestor->ingest($file['tmp_name'], $file['name']);
+                $this->contents->addMedia($stored, $user->id, trim($form['alt_text'] ?? ''));
+            } catch (MediaException) {
+                $failed = true;
+            }
+        }
+        $location = '/cms/media' . ($failed ? '?error=upload' : '');
+        return $this->auth->sessions->withCookie(Response::redirect($location), $session);
+    }
+
+    public function deleteMedia(Request $request, int $id): Response
+    {
+        $context = $this->authorized($request, 'media');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        if (!$this->auth->csrf->validate($session->token, $request->form()['_csrf'] ?? null)) {
+            return $this->failure($request, $session, $user, 419, 'Invalid request', 'errors/csrf');
+        }
+        $staged = [];
         try {
-            $stored = (new MediaIngestor($this->uploadRoot))->ingest($file['tmp_name'], $file['name']);
-            $this->contents->addMedia($stored, $user->id, trim($form['alt_text'] ?? ''));
-        } catch (MediaException) {
-            return Response::redirect('/cms/media?error=validation');
+            $this->contents->deleteMedia($id, function (array $names) use (&$staged): void {
+                foreach ($names as $name) {
+                    $path = $this->uploadRoot . '/' . basename($name);
+                    if (!file_exists($path)) {
+                        continue;
+                    }
+                    $temporary = $this->uploadRoot . '/.deleted-' . bin2hex(random_bytes(24));
+                    if (!@rename($path, $temporary)) {
+                        throw new MediaException('The stored file could not be removed.');
+                    }
+                    $staged[$temporary] = $path;
+                }
+            });
+        } catch (\Throwable $exception) {
+            foreach ($staged as $temporary => $path) {
+                if (!@rename($temporary, $path)) {
+                    error_log('Could not restore media file after failed deletion: ' . $path);
+                }
+            }
+            if (!$exception instanceof MediaException && !$exception instanceof \PDOException) {
+                throw $exception;
+            }
+            return $this->auth->sessions->withCookie(Response::redirect('/cms/media?error=delete'), $session);
         }
-        return $this->auth->sessions->withCookie(Response::redirect('/cms/media'), $session);
+        foreach ($staged as $temporary => $path) {
+            if (!@unlink($temporary)) {
+                error_log('Could not clean up deleted media file: ' . $temporary);
+            }
+        }
+        return $this->auth->sessions->withCookie(Response::redirect('/cms/media?deleted=1'), $session);
     }
 
     public function medium(Request $request, int $id): Response

@@ -346,6 +346,13 @@ final class ApplicationFactory
         );
         $router->get('/cms/media', static fn (Request $request): Response => $cms()->mediaIndex($request));
         $router->post('/cms/media', static fn (Request $request): Response => $cms()->uploadMedia($request));
+        $router->post(
+            '/cms/media/{id}/delete',
+            static fn (Request $request, array $parameters): Response => $cms()->deleteMedia(
+                $request,
+                (int) $parameters['id'],
+            ),
+        );
         $router->get(
             '/cms/media/{id}',
             static fn (Request $request, array $parameters): Response => $cms()->medium(
