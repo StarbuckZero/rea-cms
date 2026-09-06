@@ -51,6 +51,65 @@ final class PluginLifecycle
         $this->record('plugin.installed', $package->manifest->id, $actorId, $ip, $requestId);
     }
 
+    public function installExisting(StagedPackage $package, int $actorId, string $ip, string $requestId): void
+    {
+        if ($this->registry->find($package->manifest->id) !== null) {
+            throw new PluginException('The plugin is already installed.');
+        }
+        $expected = realpath($this->path($package->manifest->id));
+        $actual = realpath($package->directory);
+        if (!is_string($expected) || !is_string($actual) || !hash_equals($expected, $actual)) {
+            throw new PluginException('Only a validated plugin in the plugins directory can be installed.');
+        }
+        $registered = false;
+        try {
+            $this->registry->install($package);
+            $registered = true;
+            ($this->migrate)($package);
+            $this->clearCaches();
+        } catch (Throwable $exception) {
+            if ($registered) {
+                $this->registry->remove($package->manifest->id);
+            }
+            throw new PluginException('Plugin installation was rolled back.', previous: $exception);
+        }
+        $this->record(
+            'plugin.installed_from_directory',
+            $package->manifest->id,
+            $actorId,
+            $ip,
+            $requestId,
+        );
+    }
+
+    public function updateExisting(StagedPackage $package, int $actorId, string $ip, string $requestId): void
+    {
+        $current = $this->requireInstalled($package->manifest->id);
+        if (version_compare($package->manifest->version, $current->version, '<=')) {
+            throw new PluginException('Plugin updates must increase the semantic version.');
+        }
+        $expected = realpath($this->path($package->manifest->id));
+        $actual = realpath($package->directory);
+        if (!is_string($expected) || !is_string($actual) || !hash_equals($expected, $actual)) {
+            throw new PluginException('Only a validated plugin in the plugins directory can be updated.');
+        }
+
+        $this->registry->setState($package->manifest->id, 'maintenance');
+        try {
+            ($this->migrate)($package);
+            $this->registry->update($package);
+            $this->registry->setState($package->manifest->id, $current->state);
+            $this->clearCaches();
+        } catch (Throwable $exception) {
+            $this->registry->setState($package->manifest->id, $current->state);
+            throw new PluginException(
+                'Plugin update failed; the installed registration was preserved.',
+                previous: $exception,
+            );
+        }
+        $this->record('plugin.updated_from_directory', $package->manifest->id, $actorId, $ip, $requestId);
+    }
+
     public function update(StagedPackage $package, int $actorId, string $ip, string $requestId): void
     {
         $current = $this->requireInstalled($package->manifest->id);

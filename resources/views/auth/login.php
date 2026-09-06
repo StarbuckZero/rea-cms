@@ -5,12 +5,16 @@ declare(strict_types=1);
 /** @var callable(mixed): string $escape */
 /** @var string $csrfToken */
 /** @var string|null $error */
+/** @var string|null $success */
 ?>
 <section class="auth-panel" aria-labelledby="login-heading">
     <p class="eyebrow">Administration</p>
     <h1 id="login-heading" class="mt-3 text-3xl font-bold">Sign in</h1>
     <?php if ($error !== null): ?>
         <div class="notice-danger mt-6" role="alert"><?= $escape($error) ?></div>
+    <?php endif; ?>
+    <?php if ($success !== null): ?>
+        <div class="notice-success mt-6" role="status"><?= $escape($success) ?></div>
     <?php endif; ?>
     <form class="mt-8 space-y-6" method="post" action="/login">
         <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">

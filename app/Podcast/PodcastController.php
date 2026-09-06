@@ -60,6 +60,30 @@ final class PodcastController
         ]);
     }
 
+    public function podcasts(Request $request): Response
+    {
+        $this->requireApi($request);
+        $feeds = $this->repository->feeds(true);
+        foreach ($feeds as $feed) {
+            $this->sync->refreshIfDue($feed);
+        }
+        $feeds = $this->repository->feeds(true);
+
+        return $this->serialize($request, 'json', 'list', [
+            'data' => array_map(
+                static fn (PodcastFeed $feed): array => [
+                    'id' => $feed->id,
+                    'slug' => $feed->slug,
+                    'title' => $feed->title,
+                    'description' => $feed->description,
+                    'imageUrl' => $feed->imageUrl,
+                ],
+                $feeds,
+            ),
+            'meta' => ['total' => count($feeds)],
+        ]);
+    }
+
     public function feed(Request $request, string $slug, string $format): Response
     {
         $this->requireApi($request);

@@ -1,5 +1,6 @@
-<article>
-    <h2>{blog.title}</h2>
+<article class="rea-blog-card">
+    <p class="rea-content-meta"><time datetime="{blog.publishedAt}">{blog.publishedAt}</time></p>
+    <h2><a href="/blog/{blog.id}">{blog.title}</a></h2>
     <p>{blog.excerpt}</p>
-    <a href="/blog/{blog.slug}">Read more</a>
+    <a class="rea-content-link" href="/blog/{blog.id}">Read the post <span aria-hidden="true">→</span></a>
 </article>

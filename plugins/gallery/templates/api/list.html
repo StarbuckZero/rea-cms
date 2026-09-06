@@ -1,4 +1,15 @@
-<figure>
-    <a href="{gallery.media}"><img src="{gallery.image}" alt="{gallery.altText}"></a>
-    <figcaption>{gallery.title}</figcaption>
-</figure>
+<article class="rea-gallery-entry" data-media-type="{gallery.mediaType}">
+    <a class="rea-gallery-album-card" href="/gallery/{gallery.id}">
+        <img src="{gallery.cover}" alt="">
+        <div>
+            <p class="rea-content-meta">Album · {gallery.itemCount} items</p>
+            <h2>{gallery.title}</h2>
+            <p>{gallery.description}</p>
+            <span class="rea-content-link">Open album <span aria-hidden="true">→</span></span>
+        </div>
+    </a>
+    <figure class="rea-gallery-media-card">
+        <a href="{gallery.media}"><img src="{gallery.image}" alt="{gallery.altText}" loading="lazy"></a>
+        <figcaption><strong>{gallery.title}</strong><span>{gallery.caption}</span></figcaption>
+    </figure>
+</article>

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use ReaCms\Plugin\PluginRecord;
+use ReaCms\Plugin\PluginListing;
 
 /** @var callable(mixed): string $escape */
 /** @var string $csrfToken */
-/** @var list<PluginRecord> $plugins */
+/** @var list<PluginListing> $plugins */
 /** @var string|null $success */
 /** @var string|null $error */
 /** @var bool $canManage */
@@ -46,13 +46,13 @@ use ReaCms\Plugin\PluginRecord;
         </section>
     <?php endif; ?>
 
-    <section class="mt-8" aria-labelledby="installed-plugins-heading">
+    <section class="mt-8" aria-labelledby="plugins-heading">
         <div class="plugin-management-heading">
-            <h2 id="installed-plugins-heading" class="text-2xl font-semibold">Installed plugins</h2>
-            <span class="plugin-count"><?= count($plugins) ?> installed</span>
+            <h2 id="plugins-heading" class="text-2xl font-semibold">Plugins</h2>
+            <span class="plugin-count"><?= count($plugins) ?> found</span>
         </div>
         <?php if ($plugins === []) : ?>
-            <p class="empty-state mt-5">No plugins are installed.</p>
+            <p class="empty-state mt-5">No plugins were found.</p>
         <?php else : ?>
             <div class="plugin-list mt-5">
                 <?php foreach ($plugins as $plugin) : ?>
@@ -62,36 +62,54 @@ use ReaCms\Plugin\PluginRecord;
                                 <h3 class="text-xl font-semibold"><?= $escape($plugin->name ?: $plugin->id) ?></h3>
                                 <p class="text-sm text-secondary mt-2">Plugin ID: <code><?= $escape($plugin->id) ?></code></p>
                             </div>
-                            <span class="status-badge status-<?= $escape($plugin->state) ?>"><?= $escape(ucfirst($plugin->state)) ?></span>
+                            <span class="status-badge status-<?= $escape($plugin->status) ?>"><?= $escape($plugin->statusLabel) ?></span>
                         </div>
                         <p class="mt-4"><?= $escape($plugin->description ?: 'No description provided.') ?></p>
                         <dl class="plugin-metadata mt-4">
                             <div><dt>Version</dt><dd><?= $escape($plugin->version) ?></dd></div>
+                            <?php if ($plugin->status === 'update_available') : ?>
+                                <div><dt>Installed version</dt><dd><?= $escape($plugin->installedVersion) ?></dd></div>
+                            <?php endif; ?>
                             <div><dt>Author</dt><dd><?= $escape($plugin->author ?: 'Not provided') ?></dd></div>
                             <div><dt>Data tables</dt><dd><?= count($plugin->tables) ?></dd></div>
                         </dl>
+                        <?php if ($plugin->error !== null) : ?>
+                            <p class="notice-danger mt-4" role="alert">
+                                <strong>Validation failed:</strong> <?= $escape($plugin->error) ?>
+                            </p>
+                        <?php endif; ?>
                         <?php if ($canManage) : ?>
                             <div class="button-row mt-5">
                                 <?php $apiFormats = $plugin->manifest['api']['formats'] ?? []; ?>
-                                <?php if (is_array($apiFormats) && in_array('html', $apiFormats, true) && in_array('txt', $apiFormats, true)) : ?>
+                                <?php if ($plugin->status !== 'invalid' && $plugin->installedVersion !== null && is_array($apiFormats) && in_array('html', $apiFormats, true) && in_array('txt', $apiFormats, true)) : ?>
                                     <a class="button-secondary" href="/admin/plugins/<?= $escape($plugin->id) ?>/api-templates">
                                         API templates
                                     </a>
                                 <?php endif; ?>
-                                <?php if ($plugin->state === 'enabled') : ?>
+                                <?php if ($plugin->status === 'available' || $plugin->status === 'update_available') : ?>
+                                    <form method="post" action="/admin/plugins/<?= $escape($plugin->id) ?>/install">
+                                        <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">
+                                        <button class="button-primary" type="submit">
+                                            <?= $plugin->status === 'available' ? 'Install' : 'Install update' ?>
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
+                                <?php if ($plugin->installedState === 'enabled') : ?>
                                     <form method="post" action="/admin/plugins/<?= $escape($plugin->id) ?>/disable">
                                         <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">
                                         <button class="button-secondary" type="submit">Disable</button>
                                     </form>
-                                <?php elseif ($plugin->state === 'disabled') : ?>
+                                <?php elseif ($plugin->installedState === 'disabled' && $plugin->status !== 'invalid') : ?>
                                     <form method="post" action="/admin/plugins/<?= $escape($plugin->id) ?>/enable">
                                         <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">
                                         <button class="button-primary" type="submit">Enable</button>
                                     </form>
                                 <?php endif; ?>
-                                <a class="button-danger" href="/admin/plugins/<?= $escape($plugin->id) ?>/remove">
-                                    <?= $plugin->state === 'uninstalled' ? 'Review preserved data' : 'Remove…' ?>
-                                </a>
+                                <?php if ($plugin->installedVersion !== null) : ?>
+                                    <a class="button-danger" href="/admin/plugins/<?= $escape($plugin->id) ?>/remove">
+                                        <?= $plugin->installedState === 'uninstalled' ? 'Review preserved data' : 'Remove…' ?>
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     </article>

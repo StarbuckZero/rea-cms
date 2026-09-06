@@ -40,6 +40,7 @@ $include = [
     'docs',
     'plugins',
     'public',
+    'resources/views',
     'storage',
 ];
 
@@ -86,6 +87,9 @@ $copy = function (string $source, string $target) use (&$copy): void {
 mkdir($staging, 0755, true);
 foreach ($include as $path) {
     $copy($root . '/' . $path, $staging . '/' . $path);
+}
+if (file_put_contents($staging . '/VERSION', $version . PHP_EOL) === false) {
+    throw new RuntimeException('The release version file could not be written.');
 }
 
 $composerCommand = sprintf(

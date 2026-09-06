@@ -1,5 +1,11 @@
-<article>
-    <h2>{podcast.title}</h2>
-    <p>{podcast.description}</p>
-    <a href="{podcast.link}">Open episode</a>
+<article class="rea-podcast-card">
+    <img class="rea-podcast-art" src="{podcast.imageUrl}" alt="{podcast.feed.title} artwork" loading="lazy">
+    <div class="rea-podcast-copy">
+        <p class="rea-content-meta"><span>{podcast.feed.title}</span> · <time datetime="{podcast.publishedAt}">{podcast.publishedAt}</time></p>
+        <h2><a href="{podcast.link}">{podcast.title}</a></h2>
+        <div class="rea-podcast-description">{podcast.description | sanitized_html}</div>
+        <p class="rea-podcast-duration" data-duration="{podcast.audio.durationSeconds}">Duration: {podcast.audio.durationSeconds} seconds</p>
+        <audio controls preload="none" src="{podcast.audio.url}">Your browser does not support audio playback.</audio>
+        <a class="rea-content-link" href="{podcast.link}">Open on Libsyn <span aria-hidden="true">↗</span></a>
+    </div>
 </article>

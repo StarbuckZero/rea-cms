@@ -30,9 +30,35 @@ final class CoreMigrationRunner
      */
     public function migrate(): array
     {
-        $this->database->ensureTrackingTable($this->trackingTable);
-        $applied = $this->database->appliedMigrations($this->trackingTable);
+        $plan = $this->plan();
         $migrated = [];
+
+        foreach ($this->migrationFiles() as $file) {
+            $version = basename($file, '.sql');
+            if (!in_array($version, $plan->pending, true)) {
+                continue;
+            }
+
+            $sql = file_get_contents($file);
+            if ($sql === false || trim($sql) === '') {
+                throw new RuntimeException(sprintf('Migration "%s" is empty or unreadable.', $version));
+            }
+
+            $checksum = hash('sha256', $sql);
+            $expandedSql = str_replace('{{prefix}}', $this->tablePrefix, $sql);
+            $this->database->execute($expandedSql);
+            $this->database->record($this->trackingTable, $version, $checksum);
+            $migrated[] = $version;
+        }
+
+        return $migrated;
+    }
+
+    public function plan(): CoreMigrationPlan
+    {
+        $this->database->ensureTrackingTable($this->trackingTable);
+        $recorded = $this->database->appliedMigrations($this->trackingTable);
+        $available = [];
 
         foreach ($this->migrationFiles() as $file) {
             $version = basename($file, '.sql');
@@ -42,24 +68,29 @@ final class CoreMigrationRunner
             }
 
             $checksum = hash('sha256', $sql);
-            if (isset($applied[$version])) {
-                if (!hash_equals($applied[$version], $checksum)) {
-                    throw new RuntimeException(sprintf(
-                        'Applied migration "%s" no longer matches its recorded checksum.',
-                        $version,
-                    ));
-                }
-
-                continue;
+            if (isset($recorded[$version]) && !hash_equals($recorded[$version], $checksum)) {
+                throw new RuntimeException(sprintf(
+                    'Applied migration "%s" no longer matches its recorded checksum.',
+                    $version,
+                ));
             }
 
-            $expandedSql = str_replace('{{prefix}}', $this->tablePrefix, $sql);
-            $this->database->execute($expandedSql);
-            $this->database->record($this->trackingTable, $version, $checksum);
-            $migrated[] = $version;
+            $available[$version] = $checksum;
         }
 
-        return $migrated;
+        $unknown = array_values(array_diff(array_keys($recorded), array_keys($available)));
+        if ($unknown !== []) {
+            throw new RuntimeException(sprintf(
+                'The database contains migration "%s", which is not present in this release.',
+                $unknown[0],
+            ));
+        }
+
+        $applied = array_keys($recorded);
+        sort($applied, SORT_STRING);
+        $pending = array_values(array_diff(array_keys($available), $applied));
+
+        return new CoreMigrationPlan($applied, $pending);
     }
 
     /**

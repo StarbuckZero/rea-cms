@@ -98,6 +98,19 @@ final class AuthControllerTest extends TestCase
         self::assertStringNotContainsString('class="profile-menu"', $response->body());
     }
 
+    public function testLoginFormConfirmsACompletedWebInstallation(): void
+    {
+        $response = $this->controller->loginForm(new Request(
+            'GET',
+            '/login?installed=1',
+            [],
+            ['installed' => '1'],
+        ));
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('installed successfully', $response->body());
+    }
+
     public function testLoginRejectsMissingCsrfTokens(): void
     {
         $response = $this->controller->login(new Request(

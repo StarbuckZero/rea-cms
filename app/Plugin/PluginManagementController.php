@@ -31,6 +31,7 @@ final class PluginManagementController
         private readonly PluginApiTemplateRepository $apiTemplates,
         private readonly PluginApiFieldCatalog $apiFields,
         private readonly string $stagingRoot,
+        private readonly PluginDirectoryDiscovery $directoryPlugins,
     ) {
     }
 
@@ -42,7 +43,7 @@ final class PluginManagementController
         }
         [$session, $user] = $context;
         return $this->page($request, $session, $user, 'Plugin Management', 'admin/plugins/index', [
-            'plugins' => $this->auth->plugins->all(),
+            'plugins' => $this->directoryPlugins->all(),
             'success' => $this->successMessage($request),
             'error' => null,
             'canManage' => $this->auth->authorization->allows($user->id, 'core.plugins.manage'),
@@ -132,6 +133,57 @@ final class PluginManagementController
             return $this->indexError($request, $session, $user, $exception->getMessage(), 422);
         }
         return $this->redirect($session, '/admin/plugins?result=installed');
+    }
+
+    public function installDiscovered(Request $request, string $pluginId): Response
+    {
+        $context = $this->authorized($request, 'core.plugins.manage');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        if (!$this->validCsrf($session, $request->form()['_csrf'] ?? null)) {
+            return $this->csrfFailure(
+                $request,
+                $session,
+                $user,
+                '/admin/plugins/' . $pluginId . '/install',
+            );
+        }
+
+        try {
+            $package = $this->directoryPlugins->inspect($pluginId);
+            $installed = $this->auth->plugins->find($pluginId);
+            if ($installed === null) {
+                $this->lifecycle->installExisting(
+                    $package,
+                    $user->id,
+                    $request->clientIp(),
+                    $request->requestId(),
+                );
+                $result = 'directory-installed';
+            } else {
+                $this->lifecycle->updateExisting(
+                    $package,
+                    $user->id,
+                    $request->clientIp(),
+                    $request->requestId(),
+                );
+                $result = 'directory-updated';
+            }
+        } catch (PluginException $exception) {
+            return $this->indexError($request, $session, $user, $exception->getMessage(), 422);
+        } catch (Throwable) {
+            return $this->indexError(
+                $request,
+                $session,
+                $user,
+                'The plugin installation failed safely. No plugin was activated.',
+                500,
+            );
+        }
+
+        return $this->redirect($session, '/admin/plugins?result=' . $result);
     }
 
     public function enable(Request $request, string $pluginId): Response
@@ -568,6 +620,10 @@ final class PluginManagementController
         $result = $request->query()['result'] ?? null;
         return is_string($result) ? match ($result) {
             'installed' => 'The plugin was installed and is disabled until you enable it.',
+            'directory-installed' => 'The plugin was installed from the plugins directory and is disabled until '
+                . 'you enable it.',
+            'directory-updated' => 'The plugin was updated from the plugins directory. Its activation state was '
+                . 'preserved.',
             'enabled' => 'The plugin was enabled.',
             'disabled' => 'The plugin was disabled. Its files and data were preserved.',
             'removed' => 'The plugin was removed from service. Its data and a private copy of its files '
@@ -587,7 +643,7 @@ final class PluginManagementController
         array $headers = [],
     ): Response {
         $response = $this->page($request, $session, $user, 'Plugin Management', 'admin/plugins/index', [
-            'plugins' => $this->auth->plugins->all(),
+            'plugins' => $this->directoryPlugins->all(),
             'success' => null,
             'error' => $message,
             'canManage' => $this->auth->authorization->allows($user->id, 'core.plugins.manage'),

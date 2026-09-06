@@ -46,6 +46,21 @@ Detailed workstation, database, Apache, and validation instructions are in
 [docs/development.md](docs/development.md). Shared-hosting requirements and
 deployment assumptions are in [docs/hosting.md](docs/hosting.md).
 
+## Web installation and upgrades
+
+On a new deployment with no `.env`, every dynamic request redirects to the
+one-time installer at `/install`. Create the database and database user in the
+hosting control panel first, then use the installer to validate the platform,
+write the production environment, run migrations, and create the first super
+administrator. The route is no longer registered after `.env` is created.
+
+After activating newer application files, a super administrator can visit
+`/admin/upgrade` to inspect and apply pending database migrations. The upgrade
+requires a valid CSRF token, explicit backup confirmation, the administrator's
+current password, and an exclusive execution lock. The CLI setup and migration
+commands remain supported. See [docs/web-setup.md](docs/web-setup.md) for the
+complete workflow and recovery boundaries.
+
 ## Quality commands
 
 ```bash
@@ -67,11 +82,15 @@ Local routes:
 - `/forgot-password` — password reset request
 - `/admin` — authenticated and permission-protected administration
 - `/admin/plugins` — super-administrator plugin installation, lifecycle, backup, and removal
+- `/admin/upgrade` — super-administrator database upgrade review and execution
 - `/api/v1/status.json` — same-origin JSON API platform status
 - `/api/v1/status.html` — same-origin HTML API platform status
 - `/api/v1/status.txt` — same-origin plain-text API platform status
 
-The bundled Podcast Feed plugin can be installed and enabled with:
+Bundled plugins are discovered automatically and appear as **Available** on
+the Plugin Management page. They remain uninstalled and inactive until an
+administrator chooses **Install**. The bundled Podcast Feed plugin can also be
+installed and enabled from the command line with:
 
 ```bash
 php bin/install-reference-podcast.php --enable
@@ -81,7 +100,8 @@ It adds `/cms/podcast`, cached podcast APIs under `/api/v1/podcast`, and the
 short-lived `php bin/refresh-podcast-feeds.php` cron command. See
 [plugins/podcast/README.md](plugins/podcast/README.md) for endpoint details.
 
-The bundled Text Block plugin can be installed and enabled with:
+The bundled Text Block plugin has the same Plugin Management option and can
+also be installed and enabled from the command line with:
 
 ```bash
 php bin/install-reference-text-block.php --enable

@@ -31,12 +31,32 @@ $forbidden = [
     'storage/sessions/',
     'storage/uploads/',
 ];
+$required = [
+    '.env.example',
+    'app/Core/Http/ApplicationFactory.php',
+    'app/Operations/UpgradeController.php',
+    'app/Setup/Installer.php',
+    'bin/migrate.php',
+    'config/bootstrap.php',
+    'database/migrations/001_create_settings.sql',
+    'public/.htaccess',
+    'public/assets/app.css',
+    'public/index.php',
+    'resources/views/layouts/base.php',
+    'resources/views/layouts/setup.php',
+    'resources/views/admin/upgrade.php',
+    'resources/views/setup/install.php',
+    'vendor/composer/installed.json',
+    'VERSION',
+];
+$entries = [];
 
 for ($index = 0; $index < $zip->numFiles; $index++) {
     $name = $zip->getNameIndex($index);
     if (!is_string($name)) {
         continue;
     }
+    $entries[$name] = true;
     if (basename($name) === '.gitkeep' && str_starts_with($name, 'storage/')) {
         continue;
     }
@@ -51,6 +71,14 @@ for ($index = 0; $index < $zip->numFiles; $index++) {
             fwrite(STDERR, sprintf("Forbidden release path: %s\n", $name));
             exit(1);
         }
+    }
+}
+
+foreach ($required as $path) {
+    if (!isset($entries[$path])) {
+        $zip->close();
+        fwrite(STDERR, sprintf("Required release path is missing: %s\n", $path));
+        exit(1);
     }
 }
 

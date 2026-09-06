@@ -623,9 +623,12 @@ final class AuthController
         ?string $error = null,
         int $status = 200,
     ): Response {
+        $installed = ($request->query()['installed'] ?? null) === '1';
+
         return $this->renderPage($request, 'Sign in', $this->views->render('auth/login', [
             'csrfToken' => $csrfToken,
             'error' => $error,
+            'success' => $installed ? 'Rea CMS was installed successfully. Sign in to continue.' : null,
         ]), $status);
     }
 

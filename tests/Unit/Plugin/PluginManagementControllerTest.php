@@ -22,6 +22,7 @@ use ReaCms\Core\View\ViewRenderer;
 use ReaCms\Plugin\ManifestValidator;
 use ReaCms\Plugin\PackageInspector;
 use ReaCms\Plugin\PendingPackageStore;
+use ReaCms\Plugin\PluginDirectoryDiscovery;
 use ReaCms\Plugin\PluginLifecycle;
 use ReaCms\Plugin\PluginManagementController;
 use ReaCms\Plugin\PluginRecord;
@@ -98,10 +99,11 @@ final class PluginManagementControllerTest extends TestCase
             }
         };
         $this->apiTemplates = new InMemoryPluginApiTemplateRepository();
+        $packageInspector = new PackageInspector($validator);
         $this->controller = new PluginManagementController(
             $services,
             new ViewRenderer(dirname(__DIR__, 3) . '/resources/views'),
-            new PackageInspector($validator),
+            $packageInspector,
             new PendingPackageStore($this->root . '/staging', $validator),
             new PluginLifecycle(
                 $this->plugins,
@@ -116,6 +118,7 @@ final class PluginManagementControllerTest extends TestCase
             $this->apiTemplates,
             new PluginApiFieldCatalog($this->root . '/plugins'),
             $this->root . '/staging',
+            new PluginDirectoryDiscovery($this->root . '/plugins', $packageInspector, $this->plugins),
         );
     }
 
@@ -180,6 +183,42 @@ final class PluginManagementControllerTest extends TestCase
         self::assertSame(0, $this->data->purges);
     }
 
+    public function testRegisteredThirdPartyPluginWithoutRepositoryFilesCanBeRemoved(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->plugins->records['vendor_tools'] = new PluginRecord(
+            'vendor_tools',
+            '3.2.1',
+            'disabled',
+            hash('sha256', 'vendor-tools'),
+            'Vendor Tools',
+            'A third-party plugin that is not bundled with Rea CMS.',
+            author: 'Example Vendor',
+            tables: ['plugin_vendor_tools_entries'],
+        );
+        $session = $this->recentlyReauthenticatedSession();
+
+        $index = $this->controller->index($this->request('GET', '/admin/plugins', $session));
+        self::assertSame(200, $index->status());
+        self::assertStringContainsString('Vendor Tools', $index->body());
+        self::assertStringContainsString('Installed / Disabled', $index->body());
+        self::assertStringContainsString('/admin/plugins/vendor_tools/remove', $index->body());
+        self::assertStringNotContainsString('/admin/plugins/vendor_tools/install', $index->body());
+
+        $removed = $this->controller->uninstall($this->formRequest(
+            '/admin/plugins/vendor_tools/uninstall',
+            $session,
+            ['mode' => 'keep_data', 'confirmation' => 'REMOVE vendor_tools'],
+        ), 'vendor_tools');
+
+        self::assertSame(303, $removed->status());
+        self::assertSame('uninstalled', $this->plugins->find('vendor_tools')?->state);
+    }
+
     public function testValidatedUploadRequiresReviewThenInstallsDisabled(): void
     {
         $this->authorization->permissions[1] = [
@@ -227,6 +266,86 @@ final class PluginManagementControllerTest extends TestCase
         self::assertSame(303, $install->status());
         self::assertSame('disabled', $this->plugins->find('notes')?->state);
         self::assertFileExists($this->root . '/plugins/notes/plugin.json');
+    }
+
+    public function testBundledPluginCanBeInstalledAndListRefreshesToDisabledStatus(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->writeDirectoryPlugin('notes', '1.0.0');
+        $session = $this->authenticatedSession();
+
+        $available = $this->controller->index($this->request('GET', '/admin/plugins', $session));
+        self::assertStringContainsString('Available', $available->body());
+        self::assertStringContainsString('action="/admin/plugins/notes/install"', $available->body());
+
+        $installed = $this->controller->installDiscovered($this->formRequest(
+            '/admin/plugins/notes/install',
+            $session,
+            [],
+        ), 'notes');
+
+        self::assertSame(303, $installed->status());
+        self::assertSame('/admin/plugins?result=directory-installed', $installed->header('Location'));
+        self::assertSame('disabled', $this->plugins->find('notes')?->state);
+        self::assertFileExists($this->root . '/plugins/notes/plugin.json');
+
+        $refreshed = $this->controller->index($this->request('GET', '/admin/plugins', $session));
+        self::assertStringContainsString('Installed / Disabled', $refreshed->body());
+        self::assertStringNotContainsString('action="/admin/plugins/notes/install"', $refreshed->body());
+    }
+
+    public function testBundledPluginIsRevalidatedWhenInstallIsClicked(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->writeDirectoryPlugin('notes', '1.0.0');
+        $session = $this->authenticatedSession();
+        self::assertNotFalse(file_put_contents($this->root . '/plugins/notes/run.php', '<?php echo 1;'));
+
+        $response = $this->controller->installDiscovered($this->formRequest(
+            '/admin/plugins/notes/install',
+            $session,
+            [],
+        ), 'notes');
+
+        self::assertSame(422, $response->status());
+        self::assertNull($this->plugins->find('notes'));
+        self::assertStringContainsString('forbidden file type', $response->body());
+        self::assertStringContainsString('Invalid', $response->body());
+    }
+
+    public function testNewerBundledPluginIsShownAndInstalledAsAnUpdate(): void
+    {
+        $this->authorization->permissions[1] = [
+            'core.admin.access',
+            'core.plugins.view',
+            'core.plugins.manage',
+        ];
+        $this->plugins->records['notes'] = $this->record('enabled');
+        $this->writeDirectoryPlugin('notes', '2.0.0');
+        $session = $this->authenticatedSession();
+
+        $available = $this->controller->index($this->request('GET', '/admin/plugins', $session));
+        self::assertStringContainsString('Update Available', $available->body());
+        self::assertStringContainsString('Install update', $available->body());
+
+        $updated = $this->controller->installDiscovered($this->formRequest(
+            '/admin/plugins/notes/install',
+            $session,
+            [],
+        ), 'notes');
+
+        self::assertSame(303, $updated->status());
+        self::assertSame('/admin/plugins?result=directory-updated', $updated->header('Location'));
+        self::assertSame('2.0.0', $this->plugins->find('notes')?->version);
+        self::assertSame('enabled', $this->plugins->find('notes')?->state);
     }
 
     public function testPermanentRemovalAlwaysCreatesFinalExportBeforePurgingData(): void
@@ -408,6 +527,25 @@ final class PluginManagementControllerTest extends TestCase
         );
     }
 
+    private function writeDirectoryPlugin(string $id, string $version): void
+    {
+        self::assertTrue(mkdir($this->root . '/plugins/' . $id, 0700, true));
+        self::assertNotFalse(file_put_contents(
+            $this->root . '/plugins/' . $id . '/plugin.json',
+            json_encode([
+                'schemaVersion' => 1,
+                'id' => $id,
+                'name' => ucfirst($id),
+                'version' => $version,
+                'reaCmsVersion' => '^1.0',
+                'description' => 'A bundled plugin.',
+                'author' => 'Rea CMS',
+                'tables' => ['plugin_' . $id . '_entries'],
+                'permissions' => [],
+            ], JSON_THROW_ON_ERROR),
+        ));
+    }
+
     private function authenticatedSession(): SessionContext
     {
         $anonymous = $this->sessions->start(new Request('GET', '/login'));
@@ -449,7 +587,7 @@ final class PluginManagementControllerTest extends TestCase
                 continue;
             }
             $path = $directory . '/' . $entry;
-            is_dir($path) ? $this->removeDirectory($path) : unlink($path);
+            is_dir($path) && !is_link($path) ? $this->removeDirectory($path) : unlink($path);
         }
         rmdir($directory);
     }

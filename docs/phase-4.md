@@ -73,6 +73,15 @@ An uploaded package whose ID is already registered is rejected. Plugin updates
 must continue to use the separate version-increasing lifecycle path; ordinary
 installation never overwrites files.
 
+Plugin Management also scans the top-level `plugins` directory. Valid plugin
+directories that are not registered are listed as **Available**, including the
+reference plugins shipped with Rea CMS. Administrators can install them in
+place; they are revalidated when the action is submitted, registered, migrated,
+and left disabled. A directory with a newer manifest version is listed as
+**Update Available** and can be applied without changing the plugin's current
+activation state. Invalid directories are never installable and show the
+validation failure in the management page.
+
 Enable and disable actions retain files and tables. The registry remains the
 single source of truth for route and navigation activation, so disabled plugins
 do not expose CMS navigation or plugin routes.

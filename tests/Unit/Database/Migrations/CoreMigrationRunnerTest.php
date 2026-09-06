@@ -56,6 +56,22 @@ final class CoreMigrationRunnerTest extends TestCase
         self::assertSame([], $database->statements);
     }
 
+    public function testItReportsAppliedAndPendingMigrationsWithoutExecutingThem(): void
+    {
+        $first = 'SELECT 1;';
+        file_put_contents($this->migrationPath . '/001_first.sql', $first);
+        file_put_contents($this->migrationPath . '/002_second.sql', 'SELECT 2;');
+        $database = new InMemoryMigrationDatabase(['001_first' => hash('sha256', $first)]);
+        $runner = new CoreMigrationRunner($database, $this->migrationPath);
+
+        $plan = $runner->plan();
+
+        self::assertSame(['001_first'], $plan->applied);
+        self::assertSame(['002_second'], $plan->pending);
+        self::assertFalse($plan->isCurrent());
+        self::assertSame([], $database->statements);
+    }
+
     public function testItRejectsChangesToAnAppliedMigration(): void
     {
         file_put_contents($this->migrationPath . '/001_first.sql', 'SELECT 2;');
@@ -66,6 +82,20 @@ final class CoreMigrationRunnerTest extends TestCase
         $this->expectExceptionMessage('no longer matches its recorded checksum');
 
         $runner->migrate();
+    }
+
+    public function testItRejectsADatabaseMigratedByANewerRelease(): void
+    {
+        file_put_contents($this->migrationPath . '/001_first.sql', 'SELECT 1;');
+        $database = new InMemoryMigrationDatabase([
+            '999_future' => hash('sha256', 'SELECT 999;'),
+        ]);
+        $runner = new CoreMigrationRunner($database, $this->migrationPath);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not present in this release');
+
+        $runner->plan();
     }
 
     public function testItRejectsUnsafeTablePrefixes(): void

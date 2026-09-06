@@ -124,6 +124,36 @@ final class PackageInspectorTest extends TestCase
         );
     }
 
+    public function testExistingDirectoryIsValidatedAndHasDeterministicHash(): void
+    {
+        $root = $this->temporaryDirectory();
+        $directory = $root . '/notes';
+        self::assertTrue(mkdir($directory . '/templates', 0700, true));
+        self::assertNotFalse(file_put_contents($directory . '/plugin.json', $this->manifest()));
+        self::assertNotFalse(file_put_contents($directory . '/templates/card.html', '{{ note.title }}'));
+        $inspector = new PackageInspector(new ManifestValidator());
+
+        $first = $inspector->inspectDirectory($directory);
+        $second = $inspector->inspectDirectory($directory);
+
+        self::assertSame('notes', $first->manifest->id);
+        self::assertSame($first->packageHash, $second->packageHash);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $first->packageHash);
+    }
+
+    public function testExistingDirectoryRejectsLinksOutsidePluginRoot(): void
+    {
+        $root = $this->temporaryDirectory();
+        $directory = $root . '/notes';
+        self::assertTrue(mkdir($directory, 0700));
+        self::assertNotFalse(file_put_contents($directory . '/plugin.json', $this->manifest()));
+        self::assertTrue(symlink('/etc/passwd', $directory . '/outside.txt'));
+
+        $this->expectException(PluginException::class);
+        $this->expectExceptionMessage('Links and special files');
+        (new PackageInspector(new ManifestValidator()))->inspectDirectory($directory);
+    }
+
     /** @param array<string, string> $entries */
     private function archive(array $entries): string
     {

@@ -69,6 +69,35 @@ final class PluginLifecycleTest extends TestCase
         }
     }
 
+    public function testFailedExistingDirectoryInstallationRemovesRegistrationButKeepsFiles(): void
+    {
+        $registry = new InMemoryPluginRegistry();
+        $package = $this->package('1.0.0', 'bundled');
+        $destination = $this->root . '/plugins/notes';
+        self::assertTrue(mkdir(dirname($destination), 0700, true));
+        self::assertTrue(rename($package->directory, $destination));
+        $package = new StagedPackage($package->manifest, $destination, $package->packageHash);
+        $lifecycle = new PluginLifecycle(
+            $registry,
+            new InMemoryAuditLogger(),
+            $this->root . '/plugins',
+            $this->root . '/backups',
+            $this->root . '/cache',
+            static function (): void {
+                throw new \RuntimeException('Simulated migration failure.');
+            },
+        );
+
+        try {
+            $lifecycle->installExisting($package, 1, '127.0.0.1', str_repeat('e', 32));
+            self::fail('The simulated migration should fail.');
+        } catch (PluginException $exception) {
+            self::assertSame('Plugin installation was rolled back.', $exception->getMessage());
+            self::assertNull($registry->find('notes'));
+            self::assertFileExists($destination . '/version.txt');
+        }
+    }
+
     private function lifecycle(InMemoryPluginRegistry $registry): PluginLifecycle
     {
         return new PluginLifecycle(

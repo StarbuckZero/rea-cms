@@ -20,7 +20,10 @@
    existing private upload path with the hosting account's supported mechanism.
 4. Run `php bin/check-platform.php`, then put the site into the hosting account's
    maintenance mode or use its shortest practical maintenance window.
-5. Run `php bin/migrate.php` once. Never edit a recorded migration in place.
+5. Run `php bin/migrate.php` once, or sign in as a super administrator and use
+   `/admin/upgrade`. The browser path requires backup confirmation and the
+   administrator's current password. Never run both paths concurrently and
+   never edit a recorded migration in place.
 6. Change the document root or release pointer to the new `public/` directory.
 7. Verify `/health`, login and logout, public Blog pages, API denial/allow paths,
    media access, plugin state, error handling, and logs. End maintenance mode.

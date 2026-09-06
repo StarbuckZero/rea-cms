@@ -21,6 +21,7 @@ php bin/install-reference-podcast.php --enable
 The following API representations are available while the plugin is enabled:
 
 - `/api/v1/podcast.json`
+- `/api/v1/podcasts.json` (enabled podcast titles, descriptions, and main images)
 - `/api/v1/podcast/{feed}.json`
 - `/api/v1/podcast/{feed}.html`
 - `/api/v1/podcast/{feed}.txt`

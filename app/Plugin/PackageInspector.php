@@ -88,6 +88,84 @@ final class PackageInspector
         }
     }
 
+    public function inspectDirectory(string $directory): StagedPackage
+    {
+        if (!is_dir($directory) || is_link($directory)) {
+            throw new PluginException('The plugin directory is missing or is not a regular directory.');
+        }
+
+        $root = realpath($directory);
+        if (!is_string($root)) {
+            throw new PluginException('The plugin directory could not be resolved.');
+        }
+        $manifestPath = $root . '/plugin.json';
+        if (!is_file($manifestPath) || is_link($manifestPath)) {
+            throw new PluginException('The plugin directory must contain plugin.json at its root.');
+        }
+        $manifestJson = file_get_contents($manifestPath);
+        if (!is_string($manifestJson)) {
+            throw new PluginException('plugin.json could not be read.');
+        }
+        $manifest = $this->manifests->validate($manifestJson);
+        if (basename($root) !== $manifest->id) {
+            throw new PluginException('The plugin directory name must exactly match the plugin ID.');
+        }
+
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST,
+        );
+        $hashes = [];
+        $count = 0;
+        $total = 0;
+        foreach ($files as $file) {
+            if (!$file instanceof SplFileInfo) {
+                continue;
+            }
+            $path = $file->getPathname();
+            $relative = substr($path, strlen($root) + 1);
+            $this->validatePath($relative);
+            if (substr_count($relative, '/') + 1 > $this->maximumDepth) {
+                throw new PluginException('The plugin directory nesting-depth limit was exceeded.');
+            }
+            if ($file->isLink()) {
+                throw new PluginException('Links and special files are forbidden in plugin directories.');
+            }
+            $count++;
+            if ($count > $this->maximumFiles) {
+                throw new PluginException('The plugin directory exceeds package safety limits.');
+            }
+            if ($file->isDir()) {
+                continue;
+            }
+            if (!$file->isFile()) {
+                throw new PluginException('Links and special files are forbidden in plugin directories.');
+            }
+
+            $size = $file->getSize();
+            $total += $size;
+            if (
+                $size > $this->maximumFileBytes || $total > $this->maximumExtractedBytes
+            ) {
+                throw new PluginException('The plugin directory exceeds package safety limits.');
+            }
+            $contents = file_get_contents($path);
+            if (!is_string($contents)) {
+                throw new PluginException('The plugin directory contains an unreadable file.');
+            }
+            $this->validateContents($relative, $contents);
+            $hashes[] = $relative . ':' . hash('sha256', $contents);
+        }
+        if ($count === 0) {
+            throw new PluginException('The plugin directory does not contain any files.');
+        }
+
+        $this->validateDeclarativeFiles($manifest, $root);
+        sort($hashes, SORT_STRING);
+
+        return new StagedPackage($manifest, $root, hash('sha256', implode("\n", $hashes)));
+    }
+
     /** @return array{string, array<string, int>} */
     private function validateEntries(ZipArchive $zip): array
     {
@@ -156,10 +234,6 @@ final class PackageInspector
 
     private function validateFile(ZipArchive $zip, int $index, string $name): void
     {
-        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if (!in_array($extension, self::EXTENSIONS, true)) {
-            throw new PluginException('The package contains a forbidden file type.');
-        }
         $attributes = 0;
         $operations = 0;
         if ($zip->getExternalAttributesIndex($index, $operations, $attributes)) {
@@ -169,10 +243,19 @@ final class PackageInspector
             }
         }
         $contents = $zip->getFromIndex($index);
-        if (
-            !is_string($contents) || str_contains(strtolower($contents), '<?php')
-            || str_starts_with($contents, "#!")
-        ) {
+        if (!is_string($contents)) {
+            throw new PluginException('The package contains executable or unreadable content.');
+        }
+        $this->validateContents($name, $contents);
+    }
+
+    private function validateContents(string $name, string $contents): void
+    {
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if (!in_array($extension, self::EXTENSIONS, true)) {
+            throw new PluginException('The package contains a forbidden file type.');
+        }
+        if (str_contains(strtolower($contents), '<?php') || str_starts_with($contents, "#!")) {
             throw new PluginException('The package contains executable or unreadable content.');
         }
     }

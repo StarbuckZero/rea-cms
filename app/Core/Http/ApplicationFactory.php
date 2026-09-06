@@ -13,6 +13,7 @@ use ReaCms\Api\Template\PluginApiFieldCatalog;
 use ReaCms\Api\Template\PluginApiRenderer;
 use ReaCms\Auth\AuthController;
 use ReaCms\Auth\AuthServicesFactory;
+use ReaCms\Auth\PdoRoleLookup;
 use ReaCms\Blog\BlogController;
 use ReaCms\Blog\BlogControllerFactory;
 use ReaCms\Cms\CmsController;
@@ -24,15 +25,20 @@ use ReaCms\Core\Routing\Router;
 use ReaCms\Core\Theme\ThemePreference;
 use ReaCms\Core\View\ViewRenderer;
 use ReaCms\Database\ConnectionFactory;
+use ReaCms\Database\Migrations\CoreMigrationRunner;
+use ReaCms\Database\Migrations\PdoMigrationDatabase;
+use ReaCms\Operations\UpgradeController;
 use ReaCms\Plugin\ManifestValidator;
 use ReaCms\Plugin\PackageInspector;
 use ReaCms\Plugin\PdoPluginDataManager;
 use ReaCms\Plugin\PdoPluginMigrationRunner;
 use ReaCms\Plugin\PendingPackageStore;
+use ReaCms\Plugin\PluginDirectoryDiscovery;
 use ReaCms\Plugin\PluginLifecycle;
 use ReaCms\Plugin\PluginManagementController;
 use ReaCms\Podcast\PodcastController;
 use ReaCms\Podcast\PodcastControllerFactory;
+use ReaCms\Release\ApplicationVersion;
 use ReaCms\Support\SystemClock;
 use ReaCms\TextBlock\TextBlockController;
 use ReaCms\TextBlock\TextBlockControllerFactory;
@@ -91,11 +97,12 @@ final class ApplicationFactory
             $prefix = $environment->get('DB_TABLE_PREFIX', 'rea_') ?? 'rea_';
             $services = AuthServicesFactory::create($environment);
             $validator = new ManifestValidator($environment->get('APP_VERSION', '1.0.0') ?? '1.0.0');
+            $packageInspector = new PackageInspector($validator);
             $staging = $projectRoot . '/storage/plugins/staging';
             return new PluginManagementController(
                 $services,
                 $views,
-                new PackageInspector($validator),
+                $packageInspector,
                 new PendingPackageStore($staging, $validator),
                 new PluginLifecycle(
                     $services->plugins,
@@ -111,6 +118,28 @@ final class ApplicationFactory
                 new PdoPluginApiTemplateRepository($pdo, $projectRoot . '/plugins', $prefix),
                 new PluginApiFieldCatalog($projectRoot . '/plugins'),
                 $staging,
+                new PluginDirectoryDiscovery(
+                    $projectRoot . '/plugins',
+                    $packageInspector,
+                    $services->plugins,
+                ),
+            );
+        };
+        $upgrade = static function () use ($environment, $views, $projectRoot): UpgradeController {
+            $pdo = ConnectionFactory::create($environment);
+            $prefix = $environment->get('DB_TABLE_PREFIX', 'rea_') ?? 'rea_';
+
+            return new UpgradeController(
+                AuthServicesFactory::create($environment),
+                new PdoRoleLookup($pdo, $prefix),
+                $views,
+                new CoreMigrationRunner(
+                    new PdoMigrationDatabase($pdo),
+                    $projectRoot . '/database/migrations',
+                    $prefix,
+                ),
+                ApplicationVersion::detect($projectRoot),
+                $projectRoot . '/storage/upgrade.lock',
             );
         };
 
@@ -171,6 +200,10 @@ final class ApplicationFactory
                 $request,
                 $parameters['format'],
             ),
+        );
+        $router->get(
+            '/api/v1/podcasts.json',
+            static fn (Request $request): Response => $podcast()->podcasts($request),
         );
         $router->get(
             '/api/v1/podcast/{feed}.{format}',
@@ -425,6 +458,14 @@ final class ApplicationFactory
         );
         $router->get('/admin', static fn (Request $request): Response => $auth()->admin($request));
         $router->get(
+            '/admin/upgrade',
+            static fn (Request $request): Response => $upgrade()->index($request),
+        );
+        $router->post(
+            '/admin/upgrade',
+            static fn (Request $request): Response => $upgrade()->apply($request),
+        );
+        $router->get(
             '/admin/plugins',
             static fn (Request $request): Response => $pluginManagement()->index($request),
         );
@@ -435,6 +476,13 @@ final class ApplicationFactory
         $router->post(
             '/admin/plugins/install',
             static fn (Request $request): Response => $pluginManagement()->install($request),
+        );
+        $router->post(
+            '/admin/plugins/{id}/install',
+            static fn (Request $request, array $parameters): Response => $pluginManagement()->installDiscovered(
+                $request,
+                $parameters['id'],
+            ),
         );
         $router->post(
             '/admin/plugins/{id}/enable',

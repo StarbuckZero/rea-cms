@@ -1,4 +1,11 @@
-<figure>
-    <img src="{gallery.image}" alt="{gallery.altText}">
-    <figcaption><strong>{gallery.title}</strong> {gallery.caption}</figcaption>
-</figure>
+<article class="rea-gallery-detail" data-media-type="{gallery.mediaType}">
+    <div class="rea-gallery-album-heading">
+        <p class="rea-content-meta">Album · {gallery.itemCount} items</p>
+        <h1>{gallery.title}</h1>
+        <p>{gallery.description}</p>
+    </div>
+    <figure class="rea-gallery-media-card">
+        <img src="{gallery.image}" alt="{gallery.altText}">
+        <figcaption><strong>{gallery.title}</strong><span>{gallery.caption}</span></figcaption>
+    </figure>
+</article>

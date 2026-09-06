@@ -25,6 +25,7 @@ use ReaCms\Plugin\PluginRecord;
     <?php if ($canManagePlugins) : ?>
         <div class="button-row mt-6">
             <a class="button-secondary" href="/admin/plugins">Plugin Management</a>
+            <a class="button-secondary" href="/admin/upgrade">System Upgrade</a>
         </div>
     <?php endif; ?>
 

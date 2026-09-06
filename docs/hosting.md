@@ -87,14 +87,19 @@ SELECT @@collation_server;
 6. Select PHP 8.2+ and confirm PDO MySQL, cURL, DOM, JSON, mbstring, OpenSSL,
    fileinfo, ZIP, and GD or ImageMagick. Confirm MariaDB/MySQL uses `utf8mb4`
    and a compatible SQL mode.
-7. Run `php bin/check-platform.php` and `php bin/migrate.php` once from SSH or a
-   protected deployment job. Back up and verify restore before migrations.
-8. Configure HostGator cron to invoke short-lived CLI PHP job batches. When the
+7. For a new site, visit `/install` to run platform checks, write `.env`, apply
+   migrations, and create the first super administrator. The database and user
+   must already exist. Alternatively, use `php bin/check-platform.php`, `php
+   bin/migrate.php`, and `php bin/create-admin.php` from SSH.
+8. For an existing site, back up and verify restore, activate the new application
+   files, then use `/admin/upgrade` as a super administrator or run `php
+   bin/migrate.php` once. Never run the browser and CLI upgrade concurrently.
+9. Configure HostGator cron to invoke short-lived CLI PHP job batches. When the
    Podcast plugin is enabled, run `php bin/refresh-podcast-feeds.php` every
    minute; per-feed due times and database locks prevent unnecessary work. Do
    not configure a permanent worker daemon.
-9. Force HTTPS, verify rewrite/security headers, and enable HSTS only after all
+10. Force HTTPS, verify rewrite/security headers, and enable HSTS only after all
    subdomains are confirmed HTTPS-safe. Test login, logout, CSRF, API origins,
    private media, plugin route gating, 404s, and production-safe errors.
-10. Verify OPcache and gzip/Brotli when available, check storage quotas and PHP
+11. Verify OPcache and gzip/Brotli when available, check storage quotas and PHP
     upload/memory/time limits, and record a tested rollback procedure.

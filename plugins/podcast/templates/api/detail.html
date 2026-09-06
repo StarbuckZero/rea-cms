@@ -1,6 +1,11 @@
-<article>
-    <h1>{podcast.title}</h1>
-    <p>{podcast.description}</p>
-    {podcast.content | sanitized_html}
-    <a href="{podcast.link}">Open podcast</a>
+<article class="rea-podcast-detail">
+    <img class="rea-podcast-art" src="{podcast.imageUrl}" alt="{podcast.title} artwork">
+    <div class="rea-podcast-copy">
+        <p class="rea-content-meta"><span>{podcast.feed.title}</span> <time datetime="{podcast.publishedAt}">{podcast.publishedAt}</time></p>
+        <h1>{podcast.title}</h1>
+        <p class="rea-podcast-duration" data-duration="{podcast.audio.durationSeconds}">Duration: {podcast.audio.durationSeconds} seconds</p>
+        <audio controls preload="none" src="{podcast.audio.url}">Your browser does not support audio playback.</audio>
+        <div class="rea-podcast-description">{podcast.description | sanitized_html}</div>
+        <div class="rea-prose">{podcast.content | sanitized_html}</div>
+    </div>
 </article>
