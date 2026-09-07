@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Gallery lightbox checks</title></head><body>
+<section data-rea-gallery>
+<figure><a id="first" href="https://example.com/full-one.png"><img src="data:," alt="First image"></a><figcaption>&lt;safe caption&gt;</figcaption></figure>
+<figure><a id="second" href="https://example.com/full-two.png"><img src="data:," alt="Second image"></a></figure>
+</section>
+<script src="../../resources/js/gallery-lightbox.js"></script>
+<script>
+try {
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  const first = document.querySelector('#first');
+  first.focus();
+  first.querySelector('img').click();
+  const dialog = document.querySelector('dialog');
+  assert(dialog.open, 'Image click opens modal');
+  const image = dialog.querySelector('img');
+  assert(image.alt === 'First image', 'Alt text copied');
+  assert(image.src === first.href, 'Popup uses full image');
+  assert(dialog.textContent.includes('<safe caption>'), 'Caption rendered as text');
+  assert(!dialog.querySelector('safe'), 'Caption cannot inject markup');
+  const full = dialog.querySelector('a');
+  assert(full.target === '_blank' && full.rel.includes('noopener'), 'Full-size link uses safe new tab');
+  dialog.querySelectorAll('button')[1].click();
+  assert(image.alt === 'Second image', 'Next image');
+  dialog.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true}));
+  assert(image.alt === 'First image', 'Left arrow navigation');
+  image.dispatchEvent(new Event('error'));
+  assert(dialog.querySelector('[role=status]').textContent.includes('could not'), 'Load failure feedback');
+  dialog.querySelectorAll('button')[2].click();
+  assert(!dialog.open, 'Close button');
+  setTimeout(() => {
+    try {
+      assert(document.activeElement === first, 'Focus restored');
+      const modified = new MouseEvent('click', {bubbles: true, cancelable: true, ctrlKey: true});
+      first.dispatchEvent(modified);
+      assert(!modified.defaultPrevented && !dialog.open, 'Modified click preserves browser behavior');
+      document.body.dataset.result = 'PASS';
+    } catch (error) { document.body.dataset.result = 'FAIL: ' + error.message; }
+  }, 50);
+} catch (error) { document.body.dataset.result = 'FAIL: ' + error.message; }
+</script></body></html>

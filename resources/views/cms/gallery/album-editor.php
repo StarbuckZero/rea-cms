@@ -62,6 +62,14 @@ $id = (int) ($album['id'] ?? 0);
                       action="/cms/gallery/albums/<?= $id ?>/reorder">
                     <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">
                     <?php foreach ($items as $item) : ?>
+                        <?php if (str_starts_with((string) $item['mime_type'], 'image/')) : ?>
+                            <a data-gallery-lightbox href="/cms/media/<?= (int) $item['media_id'] ?>"
+                               data-gallery-name="<?= $escape($item['original_name']) ?>">
+                                <img loading="lazy" width="120" alt="<?= $escape($item['alt_text']) ?>"
+                                     src="/cms/media/<?= (int) $item['media_id'] ?>?thumbnail=1">
+                            </a>
+                            <a href="/cms/gallery/<?= (int) $item['id'] ?>/image">Rename image / edit alt text</a>
+                        <?php endif; ?>
                         <label class="form-label">
                             <?= $escape($item['title'] ?: $item['original_name']) ?>
                             <input class="form-input" type="number" name="position_<?= (int) $item['id'] ?>"
@@ -82,3 +90,6 @@ $id = (int) ($album['id'] ?? 0);
         <p class="text-sm text-secondary">Deleting an album leaves its Gallery items unassigned.</p>
     <?php endif; ?>
 </section>
+
+<link rel="stylesheet" href="/assets/gallery-lightbox.css?v=1">
+<script src="/assets/gallery-lightbox.js?v=1" defer></script>

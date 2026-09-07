@@ -18,9 +18,9 @@ declare(strict_types=1);
         <?php foreach ($albums as $album) : ?>
             <?php $cover = $album['cover_media_id'] === null
                 ? '/assets/gallery-default-album-cover.svg'
-                : '/cms/media/' . (int) $album['cover_media_id']; ?>
+                : '/cms/media/' . (int) $album['cover_media_id'] . '?thumbnail=1'; ?>
             <article class="plugin-card">
-                <img src="<?= $escape($cover) ?>" alt="">
+                <img loading="lazy" src="<?= $escape($cover) ?>" alt="">
                 <h2 class="mt-3 font-semibold"><?= $escape($album['title']) ?></h2>
                 <p class="text-secondary"><?= $escape($album['description']) ?></p>
                 <p class="text-sm">

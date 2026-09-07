@@ -118,6 +118,38 @@ final class PdoCmsRepository implements MediaUsage
         return $id;
     }
 
+    /** @param list<array<string, mixed>> $rows */
+    public function saveGallerySelection(?int $id, array $rows): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            foreach ($rows as $offset => $values) {
+                $this->saveGallery($offset === 0 ? $id : null, $values);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $exception) {
+            $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
+    public function saveGalleryImageMetadata(int $itemId, int $mediaId, string $name, string $altText): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->pdo->prepare('UPDATE `' . $this->media . '` '
+                . 'SET original_name=:name, alt_text=:alt WHERE id=:id');
+            $statement->execute(['name' => $name, 'alt' => $altText, 'id' => $mediaId]);
+            $statement = $this->pdo->prepare('UPDATE `plugin_gallery_items` '
+                . 'SET alt_text=:alt, updated_at=NOW(6) WHERE id=:id AND media_id=:media_id');
+            $statement->execute(['alt' => $altText, 'id' => $itemId, 'media_id' => $mediaId]);
+            $this->pdo->commit();
+        } catch (\Throwable $exception) {
+            $this->pdo->rollBack();
+            throw $exception;
+        }
+    }
+
     public function deleteGallery(int $id): void
     {
         $this->pdo->beginTransaction();

@@ -26,7 +26,7 @@ declare(strict_types=1);
                 <?php if ($mediaType === 'video') : ?>
                     <video controls preload="metadata" src="/cms/media/<?= (int) $item['media_id'] ?>"></video>
                 <?php else : ?>
-                    <img src="/cms/media/<?= (int) $item['media_id'] ?>"
+                    <img loading="lazy" src="/cms/media/<?= (int) $item['media_id'] ?>?thumbnail=1"
                          alt="<?= $escape($item['alt_text']) ?>">
                 <?php endif; ?>
                 <p class="eyebrow mt-3"><?= $escape($mediaType) ?></p>

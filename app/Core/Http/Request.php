@@ -130,19 +130,39 @@ final class Request
     public function form(): array
     {
         $values = [];
-        parse_str($this->body, $parsed);
-
-        if ($parsed === [] && str_starts_with(strtolower($this->header('content-type') ?? ''), 'multipart/form-data')) {
-            $parsed = $_POST;
-        }
-
-        foreach ($parsed as $key => $value) {
+        foreach ($this->parsedForm() as $key => $value) {
             if (is_string($key) && is_string($value)) {
                 $values[$key] = $value;
             }
         }
 
         return $values;
+    }
+
+    /**
+     * Read a list field without changing the scalar-only form() contract.
+     * Missing fields return null; malformed lists return an empty list for validation.
+     *
+     * @return list<string>|null
+     */
+    public function formList(string $name): ?array
+    {
+        $parsed = $this->parsedForm();
+        if (!array_key_exists($name, $parsed)) {
+            return null;
+        }
+        $value = $parsed[$name];
+        return self::isStringList($value) ? $value : [];
+    }
+
+    /** @return array<string|int, mixed> */
+    private function parsedForm(): array
+    {
+        parse_str($this->body, $parsed);
+        if ($parsed === [] && str_starts_with(strtolower($this->header('content-type') ?? ''), 'multipart/form-data')) {
+            return $_POST;
+        }
+        return $parsed;
     }
 
     public function clientIp(): string

@@ -321,6 +321,16 @@ final class ApplicationFactory
                 (int) $parameters['id'],
             ),
         );
+        foreach (['GET', 'POST'] as $method) {
+            $router->add(
+                $method,
+                '/cms/gallery/{id}/image',
+                static fn (Request $request, array $parameters): Response => $cms()->galleryImageMetadata(
+                    $request,
+                    (int) $parameters['id'],
+                ),
+            );
+        }
         $router->get('/cms/gallery/new', static fn (Request $request): Response => $cms()->galleryForm($request));
         $router->post('/cms/gallery', static fn (Request $request): Response => $cms()->saveGallery($request));
         $router->get(
@@ -364,6 +374,7 @@ final class ApplicationFactory
             '/media/{id}',
             static fn (Request $request, array $parameters): Response => $cms()->publicMedium(
                 (int) $parameters['id'],
+                $request,
             ),
         );
         $router->get('/cms/podcast', static fn (Request $request): Response => $podcast()->index($request));

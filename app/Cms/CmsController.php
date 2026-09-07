@@ -248,22 +248,143 @@ final class CmsController
         if (!$this->auth->csrf->validate($session->token, $form['_csrf'] ?? null)) {
             return $this->failure($request, $session, $user, 419, 'Invalid request', 'errors/csrf');
         }
-        $mediaId = filter_var($form['media_id'] ?? null, FILTER_VALIDATE_INT);
-        $medium = is_int($mediaId) ? $this->contents->medium($mediaId) : null;
-        $mediaType = $medium === null ? null : GalleryApiPresenter::mediaType((string) $medium['mime_type']);
-        if (!is_int($mediaId) || $mediaType === null) {
-            return Response::redirect('/cms/gallery/new?error=media');
+        if ($id !== null && $this->contents->galleryItem($id) === null) {
+            return $this->galleryNotFound();
         }
-        $albumId = filter_var($form['album_id'] ?? null, FILTER_VALIDATE_INT);
-        if (!is_int($albumId) || $albumId < 1 || $this->contents->galleryAlbum($albumId) === null) {
-            $albumId = 0;
+        $errors = [];
+        $selection = $request->formList('media_ids') ?? [$form['media_id'] ?? ''];
+        $selectedIds = [];
+        $types = [];
+        if ($selection === []) {
+            $errors[] = 'Select at least one image or video.';
+        } else {
+            foreach ($selection as $value) {
+                $mediaId = is_scalar($value) ? filter_var($value, FILTER_VALIDATE_INT) : false;
+                $medium = is_int($mediaId) && $mediaId > 0 ? $this->contents->medium($mediaId) : null;
+                $type = $medium === null ? null : GalleryApiPresenter::mediaType((string) $medium['mime_type']);
+                if ($type === null) {
+                    $errors[] = 'A selected file is unavailable or is not a supported image or video.';
+                    continue;
+                }
+                $selectedIds[$mediaId] = $mediaId;
+                $types[$mediaId] = $type;
+            }
         }
-        $this->contents->saveGallery($id, ['album_id' => $albumId, 'media_id' => $mediaId,
-            'media_type' => $mediaType, 'title' => trim($form['title'] ?? ''),
-            'caption' => trim($form['caption'] ?? ''), 'alt_text' => trim($form['alt_text'] ?? ''),
-            'position' => (int) ($form['position'] ?? 0),
-            'status' => ($form['status'] ?? '') === 'active' ? 'active' : 'inactive']);
+        $selectedIds = array_values($selectedIds);
+        $multiple = count($selectedIds) > 1;
+        if ($multiple && in_array('video', $types, true)) {
+            $errors[] = 'Select images only when adding multiple files. Videos can be saved individually.';
+        }
+        $albumValue = $form['album_id'] ?? '';
+        $albumId = $albumValue === '' ? 0 : filter_var($albumValue, FILTER_VALIDATE_INT);
+        if ($albumId !== 0 && (!is_int($albumId) || $albumId < 1 || $this->contents->galleryAlbum($albumId) === null)) {
+            $errors[] = 'Choose an available album.';
+        }
+        if ($multiple && !$albumId) {
+            $errors[] = 'Choose an album for multiple images.';
+        }
+        $values = ['album_id' => $albumId, 'status' => ($form['status'] ?? '') === 'active' ? 'active' : 'inactive'];
+        foreach (['title' => 255, 'caption' => 65535, 'alt_text' => 500] as $field => $limit) {
+            $value = $form[$field] ?? '';
+            if (!is_string($value) || mb_strlen($value) > $limit || ($field === 'caption' && strlen($value) > $limit)) {
+                $errors[] = 'Enter valid ' . $field . ' text within ' . $limit . ' characters.';
+            }
+            $values[$field] = is_string($value) ? trim($value) : '';
+        }
+        $position = filter_var($form['position'] ?? 0, FILTER_VALIDATE_INT);
+        if (!is_int($position) || $position < -2147483648 || $position > 2147483647 - count($selectedIds)) {
+            $errors[] = 'Enter a valid display order within the supported integer range.';
+        }
+        $values['position'] = is_int($position) ? $position : 0;
+        if ($errors === []) {
+            $rows = [];
+            foreach ($selectedIds as $offset => $mediaId) {
+                $rows[] = [...$values, 'media_id' => $mediaId, 'media_type' => $types[$mediaId],
+                    'position' => $values['position'] + $offset];
+            }
+            try {
+                $this->contents->saveGallerySelection($id, $rows);
+            } catch (\PDOException) {
+                $errors[] = 'The selection could not be saved. No changes were made. Please try again.';
+            }
+        }
+        if ($errors !== []) {
+            $content = $this->views->render('cms/gallery/editor', [
+                'item' => [...$values, 'id' => $id], 'selectedIds' => $selectedIds,
+                'media' => $this->contents->media(), 'albums' => $this->contents->galleryAlbums(),
+                'errors' => array_unique($errors), 'csrfToken' => $this->auth->csrf->token($session->token),
+            ]);
+            return $this->auth->sessions->withCookie(
+                $this->render($request, $user, 'Save gallery media', $content, 422),
+                $session
+            );
+        }
         return $this->auth->sessions->withCookie(Response::redirect('/cms/gallery'), $session);
+    }
+
+    public function galleryImageMetadata(Request $request, int $id): Response
+    {
+        $context = $this->authorized($request, 'gallery');
+        if ($context instanceof Response) {
+            return $context;
+        }
+        [$session, $user] = $context;
+        $item = $this->contents->galleryItem($id);
+        if ($item === null || GalleryApiPresenter::mediaType((string) $item['mime_type']) !== 'image') {
+            return $this->galleryNotFound();
+        }
+        $errors = [];
+        if ($request->method() === 'POST') {
+            $form = $request->form();
+            if (!$this->auth->csrf->validate($session->token, $form['_csrf'] ?? null)) {
+                return $this->failure($request, $session, $user, 419, 'Invalid request', 'errors/csrf');
+            }
+            $rawName = $form['original_name'] ?? '';
+            $name = trim($rawName);
+            $alt = $form['alt_text'] ?? null;
+            $errors = $this->galleryImageMetadataErrors($rawName, $alt);
+            $item['original_name'] = $name;
+            $item['alt_text'] = is_string($alt) ? trim($alt) : '';
+            if ($errors === []) {
+                try {
+                    $this->contents->saveGalleryImageMetadata($id, (int) $item['media_id'], $name, $item['alt_text']);
+                    return $this->auth->sessions->withCookie(
+                        Response::redirect('/cms/gallery/' . $id . '/image?saved=1'),
+                        $session
+                    );
+                } catch (\PDOException) {
+                    $errors[] = 'The image details could not be saved. No changes were made. Please try again.';
+                }
+            }
+        }
+        $content = $this->views->render('cms/gallery/image-editor', [
+            'item' => $item, 'errors' => $errors,
+            'saved' => $request->method() === 'GET' && ($request->query()['saved'] ?? '') === '1',
+            'csrfToken' => $this->auth->csrf->token($session->token),
+        ]);
+        return $this->auth->sessions->withCookie(
+            $this->render($request, $user, 'Edit image details', $content, $errors === [] ? 200 : 422),
+            $session
+        );
+    }
+
+    /** @return list<string> */
+    private function galleryImageMetadataErrors(string $name, ?string $alt): array
+    {
+        $errors = [];
+        if (
+            trim($name) === '' || !mb_check_encoding($name, 'UTF-8') || mb_strlen($name) > 255
+            || preg_match('~[\\\\/\x00-\x1F\x7F]~', $name) === 1 || in_array(trim($name), ['.', '..'], true)
+        ) {
+            $errors[] = 'Enter an image name of 1–255 characters without slashes or control characters.';
+        }
+        if (
+            !is_string($alt) || !mb_check_encoding($alt, 'UTF-8') || mb_strlen($alt) > 500
+            || preg_match('/[\x00-\x1F\x7F]/', $alt) === 1
+        ) {
+            $errors[] = 'Enter alt text of at most 500 characters without control characters.';
+        }
+        return $errors;
     }
 
     public function deleteGallery(Request $request, int $id): Response
@@ -474,22 +595,37 @@ final class CmsController
             return new Response('', 404);
         }
         $path = $this->uploadRoot . '/' . basename((string) $medium['stored_name']);
-        $body = file_get_contents($path);
+        $thumbnail = ($request->query()['thumbnail'] ?? '') === '1'
+            ? $this->imageThumbnail($path) : null;
+        $body = $thumbnail ?? @file_get_contents($path);
         return $body === false ? new Response('', 404) : new Response($body, 200, [
-            'Content-Type' => (string) $medium['mime_type'], 'Cache-Control' => 'private, max-age=3600',
+            'Content-Type' => $thumbnail === null ? (string) $medium['mime_type'] : 'image/png',
+            'Cache-Control' => 'private, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
-    public function publicMedium(int $id): Response
+    private function imageThumbnail(string $path): ?string
+    {
+        // Release ZIPs use an authoritative class map. Load this additive patch explicitly
+        // so existing installations do not need to rebuild Composer's generated files.
+        require_once dirname(__DIR__) . '/Media/ImageThumbnail.php';
+        return (new \ReaCms\Media\ImageThumbnail())->create($path);
+    }
+
+    public function publicMedium(int $id, ?Request $request = null): Response
     {
         $medium = $this->contents->medium($id);
         if ($medium === null || ($medium['visibility'] ?? '') !== 'public') {
             return new Response('', 404);
         }
-        $body = file_get_contents($this->uploadRoot . '/' . basename((string) $medium['stored_name']));
+        $path = $this->uploadRoot . '/' . basename((string) $medium['stored_name']);
+        $thumbnail = ($request?->query()['thumbnail'] ?? '') === '1'
+            ? $this->imageThumbnail($path) : null;
+        $body = $thumbnail ?? @file_get_contents($path);
         return $body === false ? new Response('', 404) : new Response($body, 200, [
-            'Content-Type' => (string) $medium['mime_type'], 'Cache-Control' => 'public, max-age=86400',
+            'Content-Type' => $thumbnail === null ? (string) $medium['mime_type'] : 'image/png',
+            'Cache-Control' => 'public, max-age=86400',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
@@ -518,6 +654,11 @@ final class CmsController
             return $this->galleryNotFound();
         }
         $response = $this->api->render('gallery', 'gallery', $format, $mode, $document);
+        if ($response !== null && $format === 'html') {
+            $response = Response::html('<link rel="stylesheet" href="/assets/gallery-lightbox.css?v=1">'
+                . '<div data-rea-gallery>' . $response->body() . '</div>'
+                . '<script src="/assets/gallery-lightbox.js?v=1" defer></script>');
+        }
         return $response === null
             ? Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406)
             : $this->galleryCors($request, $response);

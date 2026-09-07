@@ -33,3 +33,15 @@ await copyFile(
   new URL("../resources/js/text-blocks.js", import.meta.url),
   new URL("../public/assets/text-blocks.js", import.meta.url),
 );
+await copyFile(
+  new URL("../resources/js/gallery-editor.js", import.meta.url),
+  new URL("../public/assets/gallery-editor.js", import.meta.url),
+);
+await copyFile(
+  new URL("../resources/js/gallery-lightbox.js", import.meta.url),
+  new URL("../public/assets/gallery-lightbox.js", import.meta.url),
+);
+await copyFile(
+  new URL("../resources/css/gallery-lightbox.css", import.meta.url),
+  new URL("../public/assets/gallery-lightbox.css", import.meta.url),
+);

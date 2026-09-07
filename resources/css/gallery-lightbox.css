@@ -1,0 +1,29 @@
+.rea-gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(64rem, 94vw);
+  max-width: 94vw;
+  max-height: 92vh;
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid #64748b;
+  border-radius: .75rem;
+  background: #111827;
+  color: #f9fafb;
+}
+.rea-gallery-lightbox::backdrop { background: rgb(0 0 0 / 80%); }
+.rea-gallery-lightbox-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.rea-gallery-lightbox-toolbar button, .rea-gallery-lightbox-toolbar a {
+  padding: .5rem .75rem;
+  border: 1px solid #94a3b8;
+  border-radius: .25rem;
+  background: #1e293b;
+  color: #f9fafb;
+  cursor: pointer;
+  font: inherit;
+}
+.rea-gallery-lightbox-toolbar button:disabled { opacity: .5; cursor: default; }
+.rea-gallery-lightbox :focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+.rea-gallery-lightbox-image { display: block; max-width: 100%; max-height: 70vh; width: auto; height: auto; margin: auto; object-fit: contain; }
+.rea-gallery-lightbox p { margin-top: .75rem; overflow-wrap: anywhere; }

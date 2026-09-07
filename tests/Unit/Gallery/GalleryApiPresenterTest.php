@@ -17,6 +17,8 @@ final class GalleryApiPresenterTest extends TestCase
         $video = $presenter->item($this->item('video/mp4', 0));
 
         self::assertSame('image', $image['mediaType']);
+        self::assertSame('/media/12?thumbnail=1', $image['thumbnail']);
+        self::assertNull($video['thumbnail']);
         self::assertSame(8, $image['albumId']);
         self::assertSame('video', $video['mediaType']);
         self::assertNull($video['albumId']);
@@ -35,6 +37,27 @@ final class GalleryApiPresenterTest extends TestCase
         self::assertSame(3, $custom['itemCount']);
         self::assertTrue($custom['active']);
         self::assertSame('/api/v1/gallery/albums/5/items.json', $custom['links']['items']);
+    }
+
+    public function testAlbumCoverRendersInTheSharedGalleryImageTemplate(): void
+    {
+        $template = '<figure><a href="{gallery.media}"><img src="{gallery.image}" '
+            . 'alt="{gallery.altText}"></a><figcaption>{gallery.title}</figcaption></figure>';
+        foreach ([['image/jpeg', 'public'], [null, null], ['image/jpeg', 'private']] as [$mime, $visibility]) {
+            $album = (new GalleryApiPresenter())->album($this->album($mime, $visibility));
+            $html = (new \ReaCms\Plugin\SafeTemplate())->render($template, ['gallery' => $album]);
+            self::assertStringNotContainsString('src=""', $html);
+            self::assertStringNotContainsString('href=""', $html);
+            self::assertSame($album['thumbnail'], $album['image']);
+            self::assertSame($album['cover'], $album['media']);
+            self::assertSame($album['title'], $album['altText']);
+            if ($visibility !== 'public') {
+                self::assertSame(GalleryApiPresenter::DEFAULT_ALBUM_COVER, $album['thumbnail']);
+                self::assertStringNotContainsString('/media/42', $html);
+            } else {
+                self::assertSame('/media/42?thumbnail=1', $album['thumbnail']);
+            }
+        }
     }
 
     public function testGalleryDocumentsSerializeToEverySupportedFormat(): void
