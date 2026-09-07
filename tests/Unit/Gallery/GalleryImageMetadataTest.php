@@ -29,6 +29,9 @@ final class GalleryImageMetadataTest extends TestCase
         yield ['photo.jpg', str_repeat('a', 501), false];
         yield ['photo.jpg', null, false];
         yield ['photo.jpg', "bad\0alt", false];
+        yield ['photo.jpg', "bad\xFFalt", false];
+        yield ['photo.jpg', str_repeat('é', 500), true];
+        yield ['photo.jpg', str_repeat('é', 501), false];
         yield ["bad\xFF.jpg", '', false];
     }
 
@@ -42,6 +45,18 @@ final class GalleryImageMetadataTest extends TestCase
             $alt
         );
         self::assertSame($valid, $errors === []);
+    }
+
+    public function testAltValidationAlsoProtectsTheGalleryItemEditor(): void
+    {
+        $reflection = new ReflectionClass(CmsController::class);
+        $controller = $reflection->newInstanceWithoutConstructor();
+        $validate = $reflection->getMethod('galleryAltTextErrors');
+        foreach ([null, "bad\0alt", "bad\xFFalt", str_repeat('é', 501)] as $alt) {
+            self::assertNotEmpty($validate->invoke($controller, $alt));
+        }
+        self::assertSame([], $validate->invoke($controller, ''));
+        self::assertSame([], $validate->invoke($controller, 'A "quoted" <description>'));
     }
 
     public function testNamesAndAltTextAreBoundAsDataAndStoredFileIsUnchanged(): void

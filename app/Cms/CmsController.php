@@ -291,6 +291,7 @@ final class CmsController
             }
             $values[$field] = is_string($value) ? trim($value) : '';
         }
+        $errors = [...$errors, ...$this->galleryAltTextErrors($form['alt_text'] ?? null)];
         $position = filter_var($form['position'] ?? 0, FILTER_VALIDATE_INT);
         if (!is_int($position) || $position < -2147483648 || $position > 2147483647 - count($selectedIds)) {
             $errors[] = 'Enter a valid display order within the supported integer range.';
@@ -378,6 +379,13 @@ final class CmsController
         ) {
             $errors[] = 'Enter an image name of 1–255 characters without slashes or control characters.';
         }
+        return [...$errors, ...$this->galleryAltTextErrors($alt)];
+    }
+
+    /** @return list<string> */
+    private function galleryAltTextErrors(?string $alt): array
+    {
+        $errors = [];
         if (
             !is_string($alt) || !mb_check_encoding($alt, 'UTF-8') || mb_strlen($alt) > 500
             || preg_match('/[\x00-\x1F\x7F]/', $alt) === 1

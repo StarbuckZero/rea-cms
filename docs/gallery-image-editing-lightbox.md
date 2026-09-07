@@ -1,6 +1,6 @@
 # Gallery image editing and lightbox update
 
-Extract the complete `gallery-image-editing-lightbox.zip` in the app root and overwrite its included files. This includes the preceding Gallery fixes. No Composer command, database migration, asset build, Alpine.js, or other dependency is required. Reload open Gallery pages after installation.
+Deploy the updated CMS PHP files, Gallery views, and `public/assets/gallery-lightbox.js` and `.css` together. No database migration, Alpine.js, or other dependency is required. Reload open Gallery pages after deployment.
 
 ## Editing uploaded images
 
@@ -38,4 +38,8 @@ Use URLs that resolve to your actual CMS installation. This update does not reco
 
 ## Verification
 
-PHP regression tests cover invalid and Unicode input, HTML escaping, bound metadata updates, transaction rollback, and earlier Gallery functionality. Headless Chrome checks cover popup opening, safe caption rendering, full-size links, buttons, arrow navigation, load failures, focus restoration, and modified clicks. The full database-backed production site was not exercised.
+PHP regression tests cover invalid and Unicode input, HTML escaping, bound metadata updates, transaction rollback, and earlier Gallery functionality. The browser test fixture covers popup opening, safe caption rendering, full-size links, buttons, arrow navigation, load failures, focus restoration, and modified clicks. The full database-backed production site was not exercised. Alt validation is shared by the image details and Gallery item editors.
+
+## OffensiveLine.net integration
+
+The public album page loads the CMS lightbox assets explicitly and marks the album content with `data-rea-gallery`, so dynamically loaded images work with existing templates. Its HTMX adapter resolves full-size links through `/cms/media/` and preserves empty alt attributes for decorative images. Deploy the CMS assets before the updated site templates.
