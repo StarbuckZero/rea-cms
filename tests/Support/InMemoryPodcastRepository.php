@@ -16,6 +16,8 @@ final class InMemoryPodcastRepository implements PodcastRepository
 {
     /** @var array<int, PodcastFeed> */
     public array $records = [];
+    /** @var list<PodcastEpisode> */
+    public array $episodeRecords = [];
     public PodcastSettings $configuration;
     public bool $locked = false;
     public int $updated = 0;
@@ -111,16 +113,24 @@ final class InMemoryPodcastRepository implements PodcastRepository
 
     public function episodes(?int $feedId, int $limit, int $offset): array
     {
-        return [];
+        return array_slice(array_values(array_filter(
+            $this->episodeRecords,
+            static fn (PodcastEpisode $episode): bool => $feedId === null || $episode->feedId === $feedId,
+        )), $offset, $limit);
     }
 
     public function countEpisodes(?int $feedId): int
     {
-        return 0;
+        return count($this->episodes($feedId, PHP_INT_MAX, 0));
     }
 
     public function episode(int $feedId, string $episode): ?PodcastEpisode
     {
+        foreach ($this->episodes($feedId, PHP_INT_MAX, 0) as $record) {
+            if ($record->slug === $episode) {
+                return $record;
+            }
+        }
         return null;
     }
 

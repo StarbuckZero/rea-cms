@@ -44,7 +44,10 @@
       "audio.length":{"type":"integer","label":"Audio length","description":"Episode audio size in bytes when supplied."},
       "audio.type":{"type":"string","label":"Audio MIME type","description":"Episode audio MIME type."},
       "audio.durationSeconds":{"type":"integer","label":"Duration","description":"Episode duration in seconds."},
+      "audio.durationFormatted":{"type":"string","label":"Formatted duration","description":"Episode length in hours and whole minutes, such as 1 hour 25 minutes; empty when unavailable."},
       "episodeType":{"type":"string","label":"Episode type","description":"Full, trailer, or bonus episode classification."},
+      "publishedDate":{"type":"string","label":"Formatted publication date","description":"Episode date in the feed timezone, such as September 8, 2026; empty when unavailable."},
+      "publishedTime":{"type":"string","label":"Formatted publication time","description":"Episode time in the feed timezone, such as 8:30 PM; empty when unavailable."},
       "publishedAt":{"type":"datetime","label":"Published date","description":"Episode publication timestamp in ISO 8601 format."}
     }
   }

@@ -200,7 +200,8 @@ final class PodcastFeedParser
             return null;
         }
         try {
-            return new DateTimeImmutable($value);
+            $date = new DateTimeImmutable($value);
+            return DateTimeImmutable::getLastErrors() === false ? $date : null;
         } catch (\Exception) {
             return null;
         }
@@ -213,17 +214,18 @@ final class PodcastFeedParser
 
     private function duration(string $value): ?int
     {
-        if (ctype_digit($value)) {
-            return (int) $value;
+        if (preg_match('/^\d+(?::[0-5]\d){0,2}$/D', $value) !== 1) {
+            return null;
         }
-        $parts = array_map('intval', explode(':', $value));
-        if (count($parts) === 2) {
-            return ($parts[0] * 60) + $parts[1];
+        $seconds = 0;
+        foreach (explode(':', $value) as $part) {
+            $component = filter_var(ltrim($part, '0') ?: '0', FILTER_VALIDATE_INT);
+            if (!is_int($component) || $seconds > intdiv(PHP_INT_MAX - $component, 60)) {
+                return null;
+            }
+            $seconds = $seconds * 60 + $component;
         }
-        if (count($parts) === 3) {
-            return ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
-        }
-        return null;
+        return $seconds;
     }
 
     private function limit(string $value, int $bytes): string

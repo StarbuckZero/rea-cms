@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ReaCms\Podcast;
 
 use DateTimeImmutable;
+use DateTimeZone;
 
 final class PodcastEpisode
 {
@@ -31,8 +32,16 @@ final class PodcastEpisode
     }
 
     /** @return array<string, mixed> */
-    public function api(): array
-    {
+    public function api(
+        ?string $timezone = null,
+        string $defaultTimezone = PodcastSchedule::APPLICATION_DEFAULT_TIMEZONE,
+    ): array {
+        $schedule = new PodcastSchedule();
+        $timezone = trim($timezone ?? '');
+        $zone = new DateTimeZone(
+            $schedule->validTimezone($timezone) ? $timezone : $schedule->defaultTimezone($defaultTimezone),
+        );
+        $published = $this->publishedAt?->setTimezone($zone);
         return [
             'id' => $this->id,
             'feed' => ['id' => $this->feedId, 'slug' => $this->feedSlug, 'title' => $this->feedTitle],
@@ -47,11 +56,25 @@ final class PodcastEpisode
                 'length' => $this->audioLength,
                 'type' => $this->audioType,
                 'durationSeconds' => $this->durationSeconds,
+                'durationFormatted' => $this->formattedDuration(),
             ],
             'imageUrl' => $this->imageUrl,
             'explicit' => $this->explicit,
             'episodeType' => $this->episodeType,
             'publishedAt' => $this->publishedAt?->format(DATE_ATOM),
+            'publishedDate' => $published?->format('F j, Y') ?? '',
+            'publishedTime' => $published?->format('g:i A') ?? '',
         ];
+    }
+
+    private function formattedDuration(): string
+    {
+        if ($this->durationSeconds === null || $this->durationSeconds < 0) {
+            return '';
+        }
+        $hours = intdiv($this->durationSeconds, 3600);
+        $minutes = intdiv($this->durationSeconds % 3600, 60);
+        $minuteLabel = $minutes . ($minutes === 1 ? ' minute' : ' minutes');
+        return $hours === 0 ? $minuteLabel : $hours . ($hours === 1 ? ' hour ' : ' hours ') . $minuteLabel;
     }
 }

@@ -36,3 +36,16 @@ php bin/refresh-podcast-feeds.php
 Running this command every minute is safe. Each feed is checked only when its
 configured interval or timezone-aware weekly schedule is due, and a database
 lock prevents concurrent refreshes of the same feed.
+
+Episode output includes `audio.durationFormatted` (for example, `1 hour 25 minutes`),
+`publishedDate` (`September 8, 2026`), and `publishedTime` (`8:30 PM`). These fields
+are available in JSON and as `{podcast.audio.durationFormatted}`,
+`{podcast.publishedDate}`, and `{podcast.publishedTime}` in episode HTML/text templates
+and the template editors' supported-fields list. Feed JSON includes them on each episode.
+The original `audio.durationSeconds` and ISO 8601 `publishedAt` fields are preserved.
+
+Publication formatting uses the feed's configured schedule timezone, including when
+interval refresh mode is selected. Missing or invalid timezones fall back to
+`APP_TIMEZONE`, then UTC. Missing or invalid episode values produce empty formatted
+strings. Duration uses whole minutes (seconds are discarded); durations below one
+hour show only minutes, including `0 minutes` for durations below 60 seconds.

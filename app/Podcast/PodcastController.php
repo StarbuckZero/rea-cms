@@ -41,14 +41,19 @@ final class PodcastController
     public function collection(Request $request, string $format): Response
     {
         $this->requireApi($request);
+        $timezones = [];
         foreach ($this->repository->feeds(true) as $feed) {
             $this->sync->refreshIfDue($feed);
+            $timezones[$feed->id] = $feed->scheduleTimezone;
         }
         $query = ApiQuery::fromArray($request->query(), [], ['publishedAt'], 100);
         $total = $this->repository->countEpisodes(null);
         return $this->serialize($request, $format, 'list', [
             'data' => array_map(
-                static fn (PodcastEpisode $episode): array => $episode->api(),
+                fn (PodcastEpisode $episode): array => $episode->api(
+                    $timezones[$episode->feedId] ?? null,
+                    $this->defaultScheduleTimezone,
+                ),
                 $this->repository->episodes(null, $query->perPage, ($query->page - 1) * $query->perPage),
             ),
             'meta' => [
@@ -96,7 +101,10 @@ final class PodcastController
             'data' => [
                 'podcast' => $feed->api(),
                 'episodes' => array_map(
-                    static fn (PodcastEpisode $episode): array => $episode->api(),
+                    fn (PodcastEpisode $episode): array => $episode->api(
+                        $feed->scheduleTimezone,
+                        $this->defaultScheduleTimezone,
+                    ),
                     $this->repository->episodes(
                         $feed->id,
                         $query->perPage,
@@ -122,7 +130,9 @@ final class PodcastController
         if ($item === null) {
             throw new RouteNotFound();
         }
-        return $this->serialize($request, $format, 'detail', ['data' => $item->api()]);
+        return $this->serialize($request, $format, 'detail', [
+            'data' => $item->api($feed->scheduleTimezone, $this->defaultScheduleTimezone),
+        ]);
     }
 
     public function index(Request $request): Response

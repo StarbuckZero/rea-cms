@@ -6,10 +6,22 @@ namespace ReaCms\Tests\Unit\Podcast;
 
 use PHPUnit\Framework\TestCase;
 use ReaCms\Plugin\DeclarativeMigration;
+use ReaCms\Plugin\PluginRecord;
+use ReaCms\Api\Template\PluginApiFieldCatalog;
 use ReaCms\Plugin\ManifestValidator;
 
 final class PodcastPackageTest extends TestCase
 {
+    public function testFormattedFieldsAreListedForTemplateEditors(): void
+    {
+        $catalog = new PluginApiFieldCatalog(dirname(__DIR__, 3) . '/plugins');
+        $fields = $catalog->fields(new PluginRecord('podcast', '1.1.0', 'enabled', str_repeat('a', 64)));
+        $paths = array_column($fields, 'path');
+        foreach (['audio.durationSeconds', 'audio.durationFormatted', 'publishedDate', 'publishedTime'] as $path) {
+            self::assertContains($path, $paths);
+        }
+    }
+
     public function testPodcastPackageOwnsNormalizedCacheTables(): void
     {
         $root = dirname(__DIR__, 3) . '/plugins/podcast';

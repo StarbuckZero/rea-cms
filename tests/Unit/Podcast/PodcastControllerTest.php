@@ -22,6 +22,7 @@ use ReaCms\Podcast\FeedFetcher;
 use ReaCms\Podcast\FeedFetchResult;
 use ReaCms\Podcast\PodcastController;
 use ReaCms\Podcast\PodcastFeed;
+use ReaCms\Podcast\PodcastEpisode;
 use ReaCms\Podcast\PodcastFeedParser;
 use ReaCms\Podcast\PodcastFeedSyncService;
 use ReaCms\Podcast\PodcastSettings;
@@ -65,6 +66,27 @@ final class PodcastControllerTest extends TestCase
         $this->controller(false)->podcasts($this->request());
     }
 
+    public function testFormattedFieldsReachJsonAndTemplates(): void
+    {
+        $controller = $this->controller(true);
+        foreach (['json', 'html', 'txt'] as $format) {
+            $responses = [
+                $controller->collection($this->request(), $format),
+                $controller->episode($this->request(), 'first-show', 'episode-one', $format),
+            ];
+            foreach ($responses as $response) {
+                self::assertSame(200, $response->status());
+                self::assertStringContainsString('1 hour 25 minutes', $response->body());
+                self::assertStringContainsString('September 8, 2026', $response->body());
+                self::assertStringContainsString('8:30 PM', $response->body());
+            }
+        }
+        $response = $controller->feed($this->request(), 'first-show', 'json');
+        $document = json_decode($response->body(), true, 32, JSON_THROW_ON_ERROR);
+        self::assertSame('8:30 PM', $document['data']['episodes'][0]['publishedTime']);
+        self::assertSame(5100, $document['data']['episodes'][0]['audio']['durationSeconds']);
+    }
+
     private function controller(bool $enabled): PodcastController
     {
         $repository = new InMemoryPodcastRepository();
@@ -79,6 +101,7 @@ final class PodcastControllerTest extends TestCase
                 title: 'First Show',
                 description: 'The first podcast.',
                 imageUrl: 'https://example.com/first.jpg',
+                scheduleTimezone: 'America/New_York',
             ),
             2 => new PodcastFeed(
                 2,
@@ -92,6 +115,32 @@ final class PodcastControllerTest extends TestCase
                 imageUrl: 'https://example.com/hidden.jpg',
             ),
         ];
+        $repository->episodeRecords = [new PodcastEpisode(
+            1,
+            1,
+            'first-show',
+            'First Show',
+            'episode-1',
+            'episode-one',
+            'Episode One',
+            '',
+            '',
+            '',
+            '',
+            null,
+            '',
+            5100,
+            '',
+            false,
+            'full',
+            new DateTimeImmutable('2026-09-09T00:30:00Z'),
+        )];
+        $templates = new InMemoryPluginApiTemplateRepository();
+        $template = '{podcast.audio.durationFormatted} | {podcast.publishedDate} | {podcast.publishedTime}';
+        $templates->save('podcast', [
+            'html_list' => $template, 'html_detail' => $template,
+            'txt_list' => $template, 'txt_detail' => $template,
+        ]);
         $fetcher = new class implements FeedFetcher {
             public function fetch(PodcastFeed $feed, PodcastSettings $settings): FeedFetchResult
             {
@@ -114,7 +163,7 @@ final class PodcastControllerTest extends TestCase
             new OriginAllowlist(['http://rea-cms.test']),
             $this->auth($registry, $clock),
             new ViewRenderer(dirname(__DIR__, 3) . '/resources/views'),
-            new PluginApiRenderer(new InMemoryPluginApiTemplateRepository()),
+            new PluginApiRenderer($templates),
         );
     }
 

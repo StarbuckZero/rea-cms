@@ -43,6 +43,18 @@ XML;
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $podcast->contentHash);
     }
 
+    public function testInvalidEpisodeValuesBecomeNull(): void
+    {
+        foreach (['', 'oops', '-1', 'bad:30', '1:60', '1:2:3', str_repeat('9', 40)] as $duration) {
+            $xml = '<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel>'
+                . '<title>Show</title><item><guid>episode-1</guid><title>Episode</title><pubDate>invalid date</pubDate>'
+                . '<itunes:duration>' . $duration . '</itunes:duration></item></channel></rss>';
+            $episode = (new PodcastFeedParser())->parse($xml)->episodes[0];
+            self::assertNull($episode->durationSeconds);
+            self::assertNull($episode->publishedAt);
+        }
+    }
+
     public function testItRejectsDoctypesAndNonRssDocuments(): void
     {
         $parser = new PodcastFeedParser();

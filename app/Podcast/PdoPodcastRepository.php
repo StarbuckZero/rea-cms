@@ -463,7 +463,7 @@ final class PdoPodcastRepository implements PodcastRepository
             (bool) ($row['schedule_enabled'] ?? false),
             is_string($row['schedule_timezone'] ?? null)
                 ? $row['schedule_timezone']
-                : PodcastSchedule::APPLICATION_DEFAULT_TIMEZONE,
+                : '',
             $this->scheduleDays((int) $row['id']),
         );
     }
@@ -495,9 +495,15 @@ final class PdoPodcastRepository implements PodcastRepository
 
     private function date(mixed $value): ?DateTimeImmutable
     {
-        return is_string($value) && $value !== ''
-            ? new DateTimeImmutable($value, new DateTimeZone('UTC'))
-            : null;
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+        try {
+            $date = new DateTimeImmutable($value, new DateTimeZone('UTC'));
+            return DateTimeImmutable::getLastErrors() === false ? $date : null;
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     private function format(DateTimeImmutable $date): string
