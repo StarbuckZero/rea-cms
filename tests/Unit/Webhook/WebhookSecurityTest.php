@@ -27,7 +27,23 @@ final class WebhookSecurityTest extends TestCase
         yield 'loopback' => ['https://localhost/hook', '127.0.0.1'];
         yield 'private' => ['https://internal.test/hook', '10.0.0.4'];
         yield 'link local metadata' => ['https://metadata.test/hook', '169.254.169.254'];
+        yield 'shared address space' => ['https://internal.test/hook', '100.64.0.1'];
+        yield 'benchmark network' => ['https://internal.test/hook', '198.18.0.1'];
+        yield 'multicast' => ['https://internal.test/hook', '224.0.0.1'];
+        yield 'mapped IPv4' => ['https://internal.test/hook', '::ffff:127.0.0.1'];
+        yield 'IPv6 translation' => ['https://internal.test/hook', '64:ff9b::7f00:1'];
+        yield 'IPv6 tunnel' => ['https://internal.test/hook', '2002:7f00:1::'];
+        yield 'credentials' => ['https://user:pass@example.com/hook', '93.184.216.34'];
+        yield 'fragment' => ['https://example.com/hook#fragment', '93.184.216.34'];
+        yield 'custom port' => ['https://example.com:8443/hook', '93.184.216.34'];
         yield 'IPv6 loopback' => ['https://internal.test/hook', '::1'];
+    }
+
+    public function testOnePrivateAddressAmongPublicAnswersRejectsTheDestination(): void
+    {
+        $validator = new DestinationValidator(static fn (): array => ['93.184.216.34', '10.0.0.1']);
+        $this->expectException(WebhookException::class);
+        $validator->validate('https://example.com/hook');
     }
 
     public function testDnsRebindingIsRejected(): void

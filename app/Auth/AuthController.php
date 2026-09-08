@@ -256,6 +256,7 @@ final class AuthController
                 'Shared images and files.',
             )],
             'pluginAccess' => $this->services->pluginAccess,
+            'canManageWebhooks' => $this->services->authorization->allows($user->id, 'core.webhooks.manage'),
             'canManagePlugins' => $this->services->authorization->allows($user->id, 'core.plugins.view'),
         ]);
 

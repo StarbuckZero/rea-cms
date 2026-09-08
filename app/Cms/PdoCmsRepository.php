@@ -9,6 +9,7 @@ use PDOException;
 use ReaCms\Media\MediaDeletion;
 use ReaCms\Media\MediaUsage;
 use RuntimeException;
+use ReaCms\Webhook\ContentWebhookRecorder;
 
 final class PdoCmsRepository implements MediaUsage
 {
@@ -16,8 +17,11 @@ final class PdoCmsRepository implements MediaUsage
     private readonly string $usage;
     private readonly string $variants;
 
-    public function __construct(private readonly PDO $pdo, string $prefix = 'rea_')
-    {
+    public function __construct(
+        private readonly PDO $pdo,
+        string $prefix = 'rea_',
+        private readonly ?ContentWebhookRecorder $webhooks = null,
+    ) {
         if (preg_match('/^[a-z][a-z0-9_]{0,31}$/', $prefix) !== 1) {
             throw new RuntimeException('The database table prefix is invalid.');
         }
@@ -48,6 +52,21 @@ final class PdoCmsRepository implements MediaUsage
     /** @param array<string, mixed> $values */
     public function saveBlog(?int $id, int $authorId, array $values): int
     {
+        if ($this->webhooks === null) {
+            return $this->saveBlogRecord($id, $authorId, $values);
+        }
+        return $this->webhooks->transaction(function () use ($id, $authorId, $values): int {
+            $before = $this->webhooks->snapshot('blog.post', $id);
+            $result = $this->saveBlogRecord($id, $authorId, $values);
+            $after = $this->webhooks->snapshot('blog.post', $result);
+            $this->webhooks->change('blog.post', $before, $after);
+            return $result;
+        });
+    }
+
+    /** @param array<string, mixed> $values */
+    private function saveBlogRecord(?int $id, int $authorId, array $values): int
+    {
         $params = [...$values, 'author_id' => $authorId];
         if ($id === null) {
             $statement = $this->pdo->prepare('INSERT INTO `plugin_blog_posts` '
@@ -59,6 +78,7 @@ final class PdoCmsRepository implements MediaUsage
             $statement->execute($params);
             return (int) $this->pdo->lastInsertId();
         }
+        unset($params['author_id']);
         $statement = $this->pdo->prepare('UPDATE `plugin_blog_posts` SET title=:title, slug=:slug, excerpt=:excerpt, '
             . 'content=:content, status=:status, locale=:locale, visibility=:visibility, '
             . 'featured_media_id=:featured_media_id, publish_at=:publish_at, updated_at=NOW(6) WHERE id=:id');
@@ -67,6 +87,20 @@ final class PdoCmsRepository implements MediaUsage
     }
 
     public function deleteBlog(int $id): void
+    {
+        if ($this->webhooks === null) {
+            $this->deleteBlogRecord($id);
+            return;
+        }
+        $this->webhooks->transaction(function () use ($id): void {
+            $before = $this->webhooks->snapshot('blog.post', $id);
+            $this->deleteBlogRecord($id);
+            $after = null;
+            $this->webhooks->change('blog.post', $before, $after);
+        });
+    }
+
+    private function deleteBlogRecord(int $id): void
     {
         $statement = $this->pdo->prepare('UPDATE `plugin_blog_posts` SET deleted_at=NOW(6) WHERE id=:id');
         $statement->execute(['id' => $id]);
@@ -99,6 +133,21 @@ final class PdoCmsRepository implements MediaUsage
     /** @param array<string, mixed> $values */
     public function saveGallery(?int $id, array $values): int
     {
+        if ($this->webhooks === null) {
+            return $this->saveGalleryRecord($id, $values);
+        }
+        return $this->webhooks->transaction(function () use ($id, $values): int {
+            $before = $this->webhooks->snapshot('gallery.item', $id);
+            $result = $this->saveGalleryRecord($id, $values);
+            $after = $this->webhooks->snapshot('gallery.item', $result);
+            $this->webhooks->change('gallery.item', $before, $after);
+            return $result;
+        });
+    }
+
+    /** @param array<string, mixed> $values */
+    private function saveGalleryRecord(?int $id, array $values): int
+    {
         if ($id === null) {
             $statement = $this->pdo->prepare('INSERT INTO `plugin_gallery_items` '
                 . '(album_id, media_id, media_type, title, caption, alt_text, position, status, '
@@ -121,45 +170,87 @@ final class PdoCmsRepository implements MediaUsage
     /** @param list<array<string, mixed>> $rows */
     public function saveGallerySelection(?int $id, array $rows): void
     {
-        $this->pdo->beginTransaction();
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
         try {
             foreach ($rows as $offset => $values) {
                 $this->saveGallery($offset === 0 ? $id : null, $values);
             }
-            $this->pdo->commit();
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
         } catch (\Throwable $exception) {
-            $this->pdo->rollBack();
+            if ($ownsTransaction) {
+                $this->pdo->rollBack();
+            }
             throw $exception;
         }
     }
 
     public function saveGalleryImageMetadata(int $itemId, int $mediaId, string $name, string $altText): void
     {
-        $this->pdo->beginTransaction();
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
         try {
+            $affected = $this->webhooks === null ? [] : $this->rows(
+                'SELECT * FROM `plugin_gallery_items` WHERE media_id=:id FOR UPDATE',
+                ['id' => $mediaId]
+            );
             $statement = $this->pdo->prepare('UPDATE `' . $this->media . '` '
                 . 'SET original_name=:name, alt_text=:alt WHERE id=:id');
             $statement->execute(['name' => $name, 'alt' => $altText, 'id' => $mediaId]);
             $statement = $this->pdo->prepare('UPDATE `plugin_gallery_items` '
                 . 'SET alt_text=:alt, updated_at=NOW(6) WHERE id=:id AND media_id=:media_id');
             $statement->execute(['alt' => $altText, 'id' => $itemId, 'media_id' => $mediaId]);
-            $this->pdo->commit();
+            foreach ($affected as $item) {
+                $this->webhooks?->change('gallery.item', $item, $item);
+            }
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
         } catch (\Throwable $exception) {
-            $this->pdo->rollBack();
+            if ($ownsTransaction) {
+                $this->pdo->rollBack();
+            }
             throw $exception;
         }
     }
 
     public function deleteGallery(int $id): void
     {
-        $this->pdo->beginTransaction();
+        if ($this->webhooks === null) {
+            $this->deleteGalleryRecord($id);
+            return;
+        }
+        $this->webhooks->transaction(function () use ($id): void {
+            $before = $this->webhooks->snapshot('gallery.item', $id);
+            $this->deleteGalleryRecord($id);
+            $after = null;
+            $this->webhooks->change('gallery.item', $before, $after);
+        });
+    }
+
+    private function deleteGalleryRecord(int $id): void
+    {
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
         try {
             $this->clearUsage('items', $id);
             $delete = $this->pdo->prepare('DELETE FROM `plugin_gallery_items` WHERE id=:id');
             $delete->execute(['id' => $id]);
-            $this->pdo->commit();
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
         } catch (\Throwable $exception) {
-            $this->pdo->rollBack();
+            if ($ownsTransaction) {
+                $this->pdo->rollBack();
+            }
             throw $exception;
         }
     }
@@ -204,6 +295,21 @@ final class PdoCmsRepository implements MediaUsage
     /** @param array<string, mixed> $values */
     public function saveGalleryAlbum(?int $id, array $values): int
     {
+        if ($this->webhooks === null) {
+            return $this->saveGalleryAlbumRecord($id, $values);
+        }
+        return $this->webhooks->transaction(function () use ($id, $values): int {
+            $before = $this->webhooks->snapshot('gallery.album', $id);
+            $result = $this->saveGalleryAlbumRecord($id, $values);
+            $after = $this->webhooks->snapshot('gallery.album', $result);
+            $this->webhooks->change('gallery.album', $before, $after);
+            return $result;
+        });
+    }
+
+    /** @param array<string, mixed> $values */
+    private function saveGalleryAlbumRecord(?int $id, array $values): int
+    {
         if ($id === null) {
             $statement = $this->pdo->prepare('INSERT INTO `plugin_gallery_albums` '
                 . '(title, slug, description, status, cover_media_id, position, created_at, updated_at) '
@@ -225,7 +331,28 @@ final class PdoCmsRepository implements MediaUsage
 
     public function deleteGalleryAlbum(int $id): void
     {
-        $this->pdo->beginTransaction();
+        if ($this->webhooks === null) {
+            $this->deleteGalleryAlbumRecord($id);
+            return;
+        }
+        $this->webhooks->transaction(function () use ($id): void {
+            $before = $this->webhooks->snapshot('gallery.album', $id);
+            $items = $this->rows('SELECT * FROM `plugin_gallery_items` WHERE album_id=:id FOR UPDATE', ['id' => $id]);
+            $this->deleteGalleryAlbumRecord($id);
+            $after = null;
+            $this->webhooks->change('gallery.album', $before, $after);
+            foreach ($items as $item) {
+                $this->webhooks->change('gallery.item', $item, [...$item, 'album_id' => 0]);
+            }
+        });
+    }
+
+    private function deleteGalleryAlbumRecord(int $id): void
+    {
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
         try {
             $unassign = $this->pdo->prepare('UPDATE `plugin_gallery_items` '
                 . 'SET album_id=0, updated_at=NOW(6) WHERE album_id=:id');
@@ -233,9 +360,13 @@ final class PdoCmsRepository implements MediaUsage
             $this->clearUsage('albums', $id);
             $delete = $this->pdo->prepare('DELETE FROM `plugin_gallery_albums` WHERE id=:id');
             $delete->execute(['id' => $id]);
-            $this->pdo->commit();
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
         } catch (\Throwable $exception) {
-            $this->pdo->rollBack();
+            if ($ownsTransaction) {
+                $this->pdo->rollBack();
+            }
             throw $exception;
         }
     }
@@ -243,16 +374,27 @@ final class PdoCmsRepository implements MediaUsage
     /** @param array<int, int> $positions */
     public function reorderGalleryAlbum(int $albumId, array $positions): void
     {
-        $this->pdo->beginTransaction();
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
         try {
             $statement = $this->pdo->prepare('UPDATE `plugin_gallery_items` '
                 . 'SET position=:position, updated_at=NOW(6) WHERE id=:id AND album_id=:album_id');
             foreach ($positions as $itemId => $position) {
                 $statement->execute(['position' => $position, 'id' => $itemId, 'album_id' => $albumId]);
             }
-            $this->pdo->commit();
+            if ($positions !== []) {
+                $album = $this->webhooks?->snapshot('gallery.album', $albumId) ?? ['id' => $albumId];
+                $this->webhooks?->change('gallery.album', $album, $album, 'reordered');
+            }
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
         } catch (\Throwable $exception) {
-            $this->pdo->rollBack();
+            if ($ownsTransaction) {
+                $this->pdo->rollBack();
+            }
             throw $exception;
         }
     }

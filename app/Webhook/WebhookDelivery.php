@@ -6,10 +6,10 @@ namespace ReaCms\Webhook;
 
 final class WebhookDelivery
 {
-    /** @var callable(string, array<string, string>, string, int, int): array{status: int, body: string} */
+    /** @var callable(string, array<string, string>, string, int, int, list<string>): array{status: int, body: string} */
     private $send;
 
-    /** @param callable(string, array<string, string>, string, int, int): array{status: int, body: string} $send */
+    /** @param callable(string, array<string, string>, string, int, int, list<string>): array{status: int, body: string} $send */
     public function __construct(
         private readonly DestinationValidator $destinations,
         private readonly WebhookSigner $signer,
@@ -31,7 +31,14 @@ final class WebhookDelivery
             'X-Rea-Timestamp' => (string) $timestamp,
             'X-Rea-Signature' => $this->signer->sign($secret, (string) $timestamp, $deliveryId, $body),
         ];
-        $response = ($this->send)($url, $headers, $body, $this->timeoutSeconds, $this->maximumResponseBytes);
+        $response = ($this->send)(
+            $url,
+            $headers,
+            $body,
+            $this->timeoutSeconds,
+            $this->maximumResponseBytes,
+            $addresses
+        );
         if (strlen($response['body']) > $this->maximumResponseBytes) {
             throw new WebhookException('The webhook response exceeded the configured bound.');
         }

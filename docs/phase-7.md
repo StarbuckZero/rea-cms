@@ -29,6 +29,9 @@ strict caller-provided connect/read timeouts, bounded response bodies, explicit
 handler queues, capped exponential retry, and persistent delivery IDs/history.
 Secrets remain encrypted at rest and never enter logs.
 
+The working content integration, setup, and receiver protocol are documented in
+[Content webhooks](webhooks.md).
+
 ## Accessibility and performance
 
 Critical rendered pages have one main landmark and level-one heading, a working

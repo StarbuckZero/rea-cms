@@ -26,7 +26,7 @@ final class TextBlockControllerFactory
         ));
 
         return new TextBlockController(
-            new PdoTextBlockRepository($pdo),
+            new PdoTextBlockRepository($pdo, \ReaCms\Webhook\WebhookFactory::recorder($pdo, $environment)),
             new PluginRouteGate(new PdoPluginRegistry($pdo, $prefix)),
             new OriginAllowlist(array_values(array_unique([
                 $environment->require('APP_URL'),

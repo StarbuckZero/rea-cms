@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace ReaCms\Webhook;
 
+use ReaCms\Api\Policy\NetworkMatcher;
+
 final class DestinationValidator
 {
     /** @var callable(string): list<string> */
@@ -22,6 +24,7 @@ final class DestinationValidator
         if (
             !is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
             || !is_string($parts['host'] ?? null) || isset($parts['user']) || isset($parts['pass'])
+            || isset($parts['fragment']) || preg_match('/[\x00-\x20\x7f]/', $url) === 1
             || (isset($parts['port']) && $parts['port'] !== 443)
         ) {
             throw new WebhookException('Webhook destinations must use credential-free HTTPS on port 443.');
@@ -30,13 +33,21 @@ final class DestinationValidator
         if ($addresses === []) {
             throw new WebhookException('The webhook destination did not resolve.');
         }
+        $networks = new NetworkMatcher();
         foreach ($addresses as $address) {
             $publicAddress = filter_var(
                 $address,
                 FILTER_VALIDATE_IP,
-                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
+                FILTER_FLAG_GLOBAL_RANGE,
             );
-            if ($publicAddress === false) {
+            if (
+                $publicAddress === false
+                || $networks->contains('224.0.0.0/4', $address)
+                || (str_contains($address, ':')
+                    && (!$networks->contains('2000::/3', $address)
+                        || $networks->contains('2001::/23', $address)
+                        || $networks->contains('2002::/16', $address)))
+            ) {
                 throw new WebhookException('The webhook destination resolves to a disallowed network.');
             }
         }

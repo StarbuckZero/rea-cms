@@ -40,6 +40,8 @@ use ReaCms\Podcast\PodcastController;
 use ReaCms\Podcast\PodcastControllerFactory;
 use ReaCms\Release\ApplicationVersion;
 use ReaCms\Support\SystemClock;
+use ReaCms\Webhook\WebhookFactory;
+use ReaCms\Webhook\WebhookController;
 use ReaCms\TextBlock\TextBlockController;
 use ReaCms\TextBlock\TextBlockControllerFactory;
 
@@ -74,7 +76,7 @@ final class ApplicationFactory
             ));
             return new CmsController(
                 AuthServicesFactory::create($environment),
-                new PdoCmsRepository($pdo, $prefix),
+                new PdoCmsRepository($pdo, $prefix, WebhookFactory::recorder($pdo, $environment)),
                 $views,
                 $projectRoot . '/storage/uploads',
                 new OriginAllowlist(array_values(array_unique([
@@ -142,6 +144,18 @@ final class ApplicationFactory
                 $projectRoot . '/storage/upgrade.lock',
             );
         };
+
+        $webhooks = static function () use ($environment, $views): WebhookController {
+            $pdo = ConnectionFactory::create($environment);
+            return new WebhookController(
+                AuthServicesFactory::create($environment),
+                $views,
+                WebhookFactory::repository($pdo, $environment),
+                WebhookFactory::destinations()
+            );
+        };
+        $router->get('/admin/webhooks', static fn (Request $request): Response => $webhooks()->handle($request));
+        $router->post('/admin/webhooks', static fn (Request $request): Response => $webhooks()->handle($request));
 
         $router->get('/', static function (Request $request) use ($views): Response {
             $theme = ThemePreference::parse($request->cookie('rea_theme'));

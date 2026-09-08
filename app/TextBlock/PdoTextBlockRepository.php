@@ -7,11 +7,14 @@ namespace ReaCms\TextBlock;
 use DateTimeImmutable;
 use PDO;
 use PDOException;
+use ReaCms\Webhook\ContentWebhookRecorder;
 
 final class PdoTextBlockRepository implements TextBlockRepository
 {
-    public function __construct(private readonly PDO $pdo)
-    {
+    public function __construct(
+        private readonly PDO $pdo,
+        private readonly ?ContentWebhookRecorder $webhooks = null,
+    ) {
     }
 
     public function all(?string $search = null): array
@@ -48,6 +51,20 @@ final class PdoTextBlockRepository implements TextBlockRepository
 
     public function create(string $name, string $content): TextBlock
     {
+        if ($this->webhooks === null) {
+            return $this->createRecord($name, $content);
+        }
+        return $this->webhooks->transaction(function () use ($name, $content): TextBlock {
+            $before = null;
+            $result = $this->createRecord($name, $content);
+            $after = $this->webhooks->snapshot('text_block.block', $result->id);
+            $this->webhooks->change('text_block.block', $before, $after);
+            return $result;
+        });
+    }
+
+    private function createRecord(string $name, string $content): TextBlock
+    {
         $now = $this->timestamp();
         try {
             $statement = $this->pdo->prepare(
@@ -77,6 +94,20 @@ final class PdoTextBlockRepository implements TextBlockRepository
 
     public function update(int $id, string $name, string $content): void
     {
+        if ($this->webhooks === null) {
+            $this->updateRecord($id, $name, $content);
+            return;
+        }
+        $this->webhooks->transaction(function () use ($id, $name, $content): void {
+            $before = $this->webhooks->snapshot('text_block.block', $id);
+            $this->updateRecord($id, $name, $content);
+            $after = $this->webhooks->snapshot('text_block.block', $id);
+            $this->webhooks->change('text_block.block', $before, $after);
+        });
+    }
+
+    private function updateRecord(int $id, string $name, string $content): void
+    {
         try {
             $statement = $this->pdo->prepare(
                 'UPDATE `plugin_text_block_blocks` SET name = :name, content = :content, '
@@ -97,6 +128,20 @@ final class PdoTextBlockRepository implements TextBlockRepository
     }
 
     public function delete(int $id): void
+    {
+        if ($this->webhooks === null) {
+            $this->deleteRecord($id);
+            return;
+        }
+        $this->webhooks->transaction(function () use ($id): void {
+            $before = $this->webhooks->snapshot('text_block.block', $id);
+            $this->deleteRecord($id);
+            $after = null;
+            $this->webhooks->change('text_block.block', $before, $after);
+        });
+    }
+
+    private function deleteRecord(int $id): void
     {
         $statement = $this->pdo->prepare('DELETE FROM `plugin_text_block_blocks` WHERE id = :id');
         $statement->execute(['id' => $id]);

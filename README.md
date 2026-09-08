@@ -158,3 +158,11 @@ documented in [docs/phase-7.md](docs/phase-7.md).
 
 Release gates and the deployment boundary are documented in
 [docs/phase-8.md](docs/phase-8.md) and [docs/release-runbook.md](docs/release-runbook.md).
+
+### Content webhooks
+
+Blog posts, gallery albums/items, and text blocks can notify external websites of
+changes. Run `php bin/migrate.php`, configure **Administration → Webhooks**, and
+schedule `php bin/deliver-webhooks.php --limit=100` to process deliveries. See
+[webhook setup and the receiver contract](docs/webhooks.md) for event names,
+signature verification, retry behavior, and frontend cache invalidation.

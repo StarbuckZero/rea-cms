@@ -29,6 +29,10 @@ use ReaCms\Plugin\PluginRecord;
         </div>
     <?php endif; ?>
 
+    <?php if ($canManageWebhooks ?? false) : ?>
+        <div class="button-row mt-6"><a class="button-secondary" href="/admin/webhooks">Webhooks</a></div>
+    <?php endif; ?>
+
     <div class="mt-10 grid gap-6 md:grid-cols-2">
         <section class="panel" aria-labelledby="session-heading">
             <h2 id="session-heading" class="text-xl font-semibold">Session security</h2>

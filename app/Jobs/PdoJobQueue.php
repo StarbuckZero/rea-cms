@@ -115,16 +115,28 @@ final class PdoJobQueue implements JobQueue
                 'token' => $job->reservationToken]);
             return;
         }
-        $this->pdo->beginTransaction();
-        $copy = $this->pdo->prepare(sprintf(
-            'INSERT INTO `%s` (original_job_id, queue, job_type, payload_json, attempts, failure_reason) '
-            . 'SELECT id, queue, job_type, payload_json, attempts, :reason FROM `%s` '
-            . 'WHERE id = :id AND reservation_token = :token',
-            $this->failed,
-            $this->jobs,
-        ));
-        $copy->execute(['reason' => substr($reason, 0, 1000), 'id' => $job->id, 'token' => $job->reservationToken]);
-        $this->complete($job);
-        $this->pdo->commit();
+        $owner = !$this->pdo->inTransaction();
+        if ($owner) {
+            $this->pdo->beginTransaction();
+        }
+        try {
+            $copy = $this->pdo->prepare(sprintf(
+                'INSERT INTO `%s` (original_job_id, queue, job_type, payload_json, attempts, failure_reason) '
+                . 'SELECT id, queue, job_type, payload_json, attempts, :reason FROM `%s` '
+                . 'WHERE id = :id AND reservation_token = :token',
+                $this->failed,
+                $this->jobs,
+            ));
+            $copy->execute(['reason' => substr($reason, 0, 1000), 'id' => $job->id, 'token' => $job->reservationToken]);
+            $this->complete($job);
+            if ($owner) {
+                $this->pdo->commit();
+            }
+        } catch (\Throwable $exception) {
+            if ($owner) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
     }
 }
