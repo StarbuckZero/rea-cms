@@ -1,0 +1,209 @@
+{
+  "operations": [
+    {
+      "action": "create_table",
+      "table": "plugin_events_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "primary": true,
+          "autoIncrement": true
+        },
+        {
+          "name": "title",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "type_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "short_description",
+          "type": "text"
+        },
+        {
+          "name": "description",
+          "type": "text"
+        },
+        {
+          "name": "image_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "location",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "address",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "city",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "state",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "zip",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "country",
+          "type": "varchar",
+          "length": 255
+        },
+        {
+          "name": "start_date",
+          "type": "varchar",
+          "length": 10
+        },
+        {
+          "name": "end_date",
+          "type": "varchar",
+          "length": 10
+        },
+        {
+          "name": "start_time",
+          "type": "varchar",
+          "length": 8
+        },
+        {
+          "name": "end_time",
+          "type": "varchar",
+          "length": 8
+        },
+        {
+          "name": "timezone",
+          "type": "varchar",
+          "length": 64
+        },
+        {
+          "name": "all_day",
+          "type": "boolean"
+        },
+        {
+          "name": "url",
+          "type": "varchar",
+          "length": 1000
+        },
+        {
+          "name": "published",
+          "type": "boolean"
+        },
+        {
+          "name": "start_utc",
+          "type": "varchar",
+          "length": 32
+        },
+        {
+          "name": "end_utc",
+          "type": "varchar",
+          "length": 32
+        },
+        {
+          "name": "created_at",
+          "type": "varchar",
+          "length": 32
+        },
+        {
+          "name": "updated_at",
+          "type": "varchar",
+          "length": 32
+        }
+      ]
+    },
+    {
+      "action": "create_table",
+      "table": "plugin_events_types",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "primary": true,
+          "autoIncrement": true
+        },
+        {
+          "name": "name",
+          "type": "varchar",
+          "length": 191
+        },
+        {
+          "name": "slug",
+          "type": "varchar",
+          "length": 191
+        },
+        {
+          "name": "description",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "action": "create_table",
+      "table": "plugin_events_settings",
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "primary": true
+        },
+        {
+          "name": "default_image_id",
+          "type": "bigint",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "action": "create_index",
+      "table": "plugin_events_events",
+      "name": "events_public_date",
+      "columns": [
+        "published",
+        "start_utc"
+      ],
+      "unique": false
+    },
+    {
+      "action": "create_index",
+      "table": "plugin_events_events",
+      "name": "events_public_end",
+      "columns": [
+        "published",
+        "end_utc"
+      ],
+      "unique": false
+    },
+    {
+      "action": "create_index",
+      "table": "plugin_events_events",
+      "name": "events_type_date",
+      "columns": [
+        "type_id",
+        "start_date",
+        "end_date"
+      ],
+      "unique": false
+    },
+    {
+      "action": "create_index",
+      "table": "plugin_events_types",
+      "name": "events_type_slug",
+      "columns": [
+        "slug"
+      ],
+      "unique": true
+    }
+  ]
+}

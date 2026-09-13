@@ -111,7 +111,7 @@ final class CmsController
             return $this->auth->sessions->withCookie(Response::json([
                 'error' => [
                     'code' => 'invalid_image',
-                    'message' => 'The image must be a valid JPEG, PNG, or WebP file no larger than 25 MB.',
+                    'message' => 'The image must be a valid JPEG, PNG, or WebP file no larger than 100 MB.',
                 ],
             ], 422), $session);
         }

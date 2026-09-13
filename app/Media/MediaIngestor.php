@@ -20,7 +20,7 @@ final class MediaIngestor
     /** @param callable(string, string): bool|null $scanner */
     public function __construct(
         private readonly string $storageRoot,
-        private readonly int $maximumBytes = 25_000_000,
+        private readonly int $maximumBytes = 100_000_000,
         ?callable $scanner = null
     ) {
         $this->scanner = $scanner ?? static fn (): bool => true;

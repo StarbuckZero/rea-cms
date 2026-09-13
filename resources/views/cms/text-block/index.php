@@ -18,7 +18,10 @@ use ReaCms\TextBlock\TextBlock;
             <h1 class="text-3xl font-bold">Text Blocks</h1>
             <p class="mt-2 text-secondary">Manage reusable text served through the JSON, HTML, and TXT APIs.</p>
         </div>
-        <a class="button-primary" href="/cms/text-block/new">New text block</a>
+        <div class="button-row">
+            <a class="button-secondary" href="/admin/plugins/text_block/api-templates">Edit HTML / Text templates</a>
+            <a class="button-primary" href="/cms/text-block/new">New text block</a>
+        </div>
     </div>
 
     <?php if ($message !== '') : ?>

@@ -14,6 +14,7 @@ declare(strict_types=1);
     <h1 class="mt-3 text-3xl font-bold">Media</h1>
     <?php if ($uploadFailed) : ?>
         <p class="mt-4" role="alert">Some files could not be uploaded. Successfully uploaded files appear below.
+            Each file must be 100 MB or smaller; your hosting account may impose a lower upload limit.
             Check the remaining files and try uploading only those files again.</p>
     <?php endif; ?>
     <?php if ($deleteFailed) : ?>
@@ -31,7 +32,10 @@ declare(strict_types=1);
         <label class="form-label">Alt text / accessible label
             <input class="form-input" name="alt_text">
         </label>
-        <p class="text-sm text-secondary">Select one or more files. The alt text applies to every selected file.</p>
+        <p class="text-sm text-secondary">Select one or more files, up to 100 MB (100,000,000 bytes) each.
+            The alt text applies to every selected file.</p>
+        <p class="text-sm text-secondary">Supported videos: MP4, WebM and MOV. After uploading,
+            <a href="/cms/gallery/new">add your images or videos to the Gallery</a>.</p>
         <button class="button-primary" type="submit">Upload media</button>
     </form>
     <div class="media-grid mt-8">

@@ -6,7 +6,7 @@ namespace ReaCms\Support;
 
 final class PlainText
 {
-    public static function fromHtml(string $value): string
+    public static function fromHtml(string $value, bool $asciiOnly = true): string
     {
         $text = str_replace(["\r\n", "\r"], "\n", $value);
         for ($pass = 0; $pass < 3; $pass++) {
@@ -41,6 +41,10 @@ final class PlainText
         unset($line);
         $text = trim(implode("\n", $lines));
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? '';
+
+        if (!$asciiOnly) {
+            return trim(preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/u', '', $text) ?? '');
+        }
 
         if (function_exists('iconv')) {
             $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);

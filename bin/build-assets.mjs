@@ -45,3 +45,7 @@ await copyFile(
   new URL("../resources/css/gallery-lightbox.css", import.meta.url),
   new URL("../public/assets/gallery-lightbox.css", import.meta.url),
 );
+await copyFile(
+  new URL('../resources/js/events.js', import.meta.url),
+  new URL('../public/assets/events.js', import.meta.url),
+);

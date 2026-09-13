@@ -54,6 +54,33 @@ final class ApplicationFactoryTest extends TestCase
         self::assertSame('{"status":"ok"}', $response->body());
     }
 
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
+    public function testEventsZipLoadsNewClassesWithoutComposerDiscovery(): void
+    {
+        $rejectEvents = static function (string $class): void {
+            if (str_starts_with($class, 'ReaCms\\Events\\')) {
+                throw new \RuntimeException('The installed Composer map cannot resolve Events classes.');
+            }
+        };
+        spl_autoload_register($rejectEvents, true, true);
+        try {
+            $application = ApplicationFactory::create($this->environment(), $this->projectRoot);
+            // No database is configured; verify class loading before connection setup fails.
+            $application->handle(new Request('GET', '/cms/events'));
+            foreach (
+                [
+                'EventDates', 'EventValidator', 'EventQuery', 'EventPresenter', 'EventCalendar',
+                'PdoEventRepository', 'EventController', 'EventControllerFactory',
+                ] as $class
+            ) {
+                self::assertTrue(class_exists('ReaCms\\Events\\' . $class, false), $class);
+            }
+        } finally {
+            spl_autoload_unregister($rejectEvents);
+        }
+    }
+
     private function environment(): Environment
     {
         return Environment::fromArray([

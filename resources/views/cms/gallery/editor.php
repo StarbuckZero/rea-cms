@@ -12,7 +12,12 @@ $selectedIds = $selectedIds ?? [(int) ($item['media_id'] ?? 0)];
 ?>
 <section>
     <p class="eyebrow">Gallery</p>
-    <h1 class="mt-3 text-3xl font-bold"><?= $id ? 'Edit media' : 'Add media' ?></h1>
+    <h1 class="mt-3 text-3xl font-bold"><?= $id ? 'Edit media' : 'Add images or videos' ?></h1>
+    <p class="mt-3 text-secondary">
+        Choose an uploaded image or video below. For a new file,
+        <a href="/cms/media">upload it in Media</a> first, then return here to add it to the gallery.
+        Supported video formats: MP4, WebM and MOV.
+    </p>
     <form class="panel mt-8 space-y-5" method="post"
           action="<?= $id ? '/cms/gallery/' . $id : '/cms/gallery' ?>">
         <?php if (!empty($errors)) : ?>

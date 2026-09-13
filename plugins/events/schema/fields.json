@@ -1,0 +1,28 @@
+{
+  "fields": {
+    "id": "bigint",
+    "title": "varchar",
+    "type_id": "bigint",
+    "short_description": "text",
+    "description": "text",
+    "image_id": "bigint",
+    "location": "varchar",
+    "address": "varchar",
+    "city": "varchar",
+    "state": "varchar",
+    "zip": "varchar",
+    "country": "varchar",
+    "start_date": "varchar",
+    "end_date": "varchar",
+    "start_time": "varchar",
+    "end_time": "varchar",
+    "timezone": "varchar",
+    "all_day": "boolean",
+    "url": "varchar",
+    "published": "boolean",
+    "start_utc": "varchar",
+    "end_utc": "varchar",
+    "created_at": "varchar",
+    "updated_at": "varchar"
+  }
+}

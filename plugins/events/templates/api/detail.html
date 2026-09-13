@@ -1,0 +1,10 @@
+<article class="event">
+    <img src="{event.image}" alt="{event.title}"><h1>{event.title}</h1>
+    <div>{event.description | sanitized_html}</div>
+    <p><strong>Type:</strong> {event.type}</p>
+    <p><strong>Date:</strong> {event.formattedDate}</p>
+    <p><strong>Time:</strong> {event.formattedTime} ({event.timezone})</p>
+    <p><strong>Location:</strong> {event.location}</p>
+    <p>{event.address}, {event.city}, {event.state} {event.zip}, {event.country}</p>
+    <a href="{event.url}">Event website</a> <a href="{event.calendarUrl}">Add to calendar</a>
+</article>

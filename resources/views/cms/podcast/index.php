@@ -20,7 +20,10 @@ use ReaCms\Podcast\PodcastSchedule;
             <h1 class="text-3xl font-bold">Podcast Feeds</h1>
             <p class="mt-2 text-secondary">RSS is synchronized into the database and served from cached data.</p>
         </div>
-        <a class="button-primary" href="/cms/podcast/new">Add feed</a>
+        <div class="button-row">
+            <a class="button-secondary" href="/admin/plugins/podcast/api-templates">Edit HTML / Text templates</a>
+            <a class="button-primary" href="/cms/podcast/new">Add feed</a>
+        </div>
     </div>
     <?php if ($message !== '') : ?>
         <div class="panel mt-6"><p><?= $escape($message) ?></p></div>

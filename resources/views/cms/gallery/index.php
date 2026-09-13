@@ -11,13 +11,19 @@ declare(strict_types=1);
     <div class="widget-heading mt-3">
         <h1 class="text-3xl font-bold">Gallery</h1>
         <div class="button-row">
+            <a class="button-secondary" href="/admin/plugins/gallery/api-templates">Edit HTML / Text templates</a>
             <a class="button-secondary" href="/cms/gallery/albums">Manage albums</a>
-            <a class="button-primary" href="/cms/gallery/new">Add media</a>
+            <a class="button-primary" href="/cms/gallery/new">Add images or videos</a>
         </div>
     </div>
     <p class="mt-3 text-secondary">
         <?= count($items) ?> item<?= count($items) === 1 ? '' : 's' ?> across
         <?= count($albums) ?> album<?= count($albums) === 1 ? '' : 's' ?>.
+    </p>
+    <p class="mt-3 text-secondary">
+        To add a video, <a href="/cms/media">upload it in Media</a>, then choose
+        <a href="/cms/gallery/new">Add images or videos</a> and select the uploaded file.
+        Videos are added one at a time.
     </p>
     <div class="media-grid mt-8">
         <?php foreach ($items as $item) : ?>

@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "id": "events",
+  "name": "Events / Schedule",
+  "version": "1.0.0",
+  "reaCmsVersion": "^1.0",
+  "description": "Manage and publish events with configurable HTML/Text templates and iCalendar downloads.",
+  "author": "Rea CMS",
+  "navigation": {
+    "label": "Events",
+    "path": "/cms/events"
+  },
+  "tables": [
+    "plugin_events_events",
+    "plugin_events_types",
+    "plugin_events_settings"
+  ],
+  "permissions": [
+    "events.events.view",
+    "events.events.create",
+    "events.events.update",
+    "events.events.delete",
+    "events.events.publish",
+    "events.types.manage",
+    "events.settings.manage"
+  ],
+  "api": {
+    "resource": "events",
+    "binding": "event",
+    "formats": [
+      "json",
+      "html",
+      "txt"
+    ],
+    "defaultPolicy": "same-origin",
+    "fields": {
+      "id": {
+        "type": "integer",
+        "label": "id",
+        "description": "Event id."
+      },
+      "title": {
+        "type": "string",
+        "label": "title",
+        "description": "Event title."
+      },
+      "type": {
+        "type": "string",
+        "label": "type",
+        "description": "Template display alias; JSON exposes a structured object."
+      },
+      "shortDescription": {
+        "type": "text",
+        "label": "shortDescription",
+        "description": "Event shortDescription."
+      },
+      "description": {
+        "type": "html",
+        "label": "description",
+        "description": "Event description."
+      },
+      "image": {
+        "type": "url",
+        "label": "image",
+        "description": "Event image."
+      },
+      "eventImage": {
+        "type": "url",
+        "label": "eventImage",
+        "description": "Event eventImage."
+      },
+      "defaultImage": {
+        "type": "url",
+        "label": "defaultImage",
+        "description": "Event defaultImage."
+      },
+      "location": {
+        "type": "string",
+        "label": "location",
+        "description": "Template display alias; JSON exposes a structured object."
+      },
+      "address": {
+        "type": "string",
+        "label": "address",
+        "description": "Event address."
+      },
+      "city": {
+        "type": "string",
+        "label": "city",
+        "description": "Event city."
+      },
+      "state": {
+        "type": "string",
+        "label": "state",
+        "description": "Event state."
+      },
+      "zip": {
+        "type": "string",
+        "label": "zip",
+        "description": "Event zip."
+      },
+      "country": {
+        "type": "string",
+        "label": "country",
+        "description": "Event country."
+      },
+      "startDate": {
+        "type": "string",
+        "label": "startDate",
+        "description": "Event startDate."
+      },
+      "startTime": {
+        "type": "string",
+        "label": "startTime",
+        "description": "Event startTime."
+      },
+      "endDate": {
+        "type": "string",
+        "label": "endDate",
+        "description": "Event endDate."
+      },
+      "endTime": {
+        "type": "string",
+        "label": "endTime",
+        "description": "Event endTime."
+      },
+      "startDateTime": {
+        "type": "datetime",
+        "label": "startDateTime",
+        "description": "Event startDateTime."
+      },
+      "endDateTime": {
+        "type": "datetime",
+        "label": "endDateTime",
+        "description": "Event endDateTime."
+      },
+      "timezone": {
+        "type": "string",
+        "label": "timezone",
+        "description": "Event timezone."
+      },
+      "allDay": {
+        "type": "boolean",
+        "label": "allDay",
+        "description": "Event allDay."
+      },
+      "formattedDate": {
+        "type": "string",
+        "label": "formattedDate",
+        "description": "Event formattedDate."
+      },
+      "formattedTime": {
+        "type": "string",
+        "label": "formattedTime",
+        "description": "Event formattedTime."
+      },
+      "url": {
+        "type": "url",
+        "label": "url",
+        "description": "Event url."
+      },
+      "createdAt": {
+        "type": "datetime",
+        "label": "createdAt",
+        "description": "Event createdAt."
+      },
+      "updatedAt": {
+        "type": "datetime",
+        "label": "updatedAt",
+        "description": "Event updatedAt."
+      },
+      "published": {
+        "type": "boolean",
+        "label": "published",
+        "description": "Event published."
+      },
+      "calendarUrl": {
+        "type": "url",
+        "label": "calendarUrl",
+        "description": "Event calendarUrl."
+      },
+      "typeId": {
+        "type": "integer",
+        "label": "typeId",
+        "description": "Event type typeId."
+      },
+      "typeName": {
+        "type": "string",
+        "label": "typeName",
+        "description": "Event type typeName."
+      },
+      "typeSlug": {
+        "type": "string",
+        "label": "typeSlug",
+        "description": "Event type typeSlug."
+      }
+    }
+  }
+}

@@ -110,6 +110,12 @@ php bin/install-reference-text-block.php --enable
 It adds reusable content management under `/cms/text-block` and JSON, HTML,
 and TXT APIs under `/api/v1/text-block` with lookup by ID or URL-safe name.
 
+The bundled Events / Schedule plugin adds event and type management under
+`/cms/events`, searchable and paginated JSON/HTML/TXT APIs under `/api/v1/events`,
+and dynamic ICS downloads. Install it in Plugin Management or run
+`php bin/install-reference-events.php --enable`. See
+[plugins/events/README.md](plugins/events/README.md) for API and template details.
+
 The default API policy requires an exact configured `Origin` header. For
 example:
 

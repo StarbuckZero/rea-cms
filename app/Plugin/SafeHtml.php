@@ -37,7 +37,7 @@ final class SafeHtml
         $previousErrors = libxml_use_internal_errors(true);
         $document = new DOMDocument('1.0', 'UTF-8');
         $loaded = $document->loadHTML(
-            '<!doctype html><html><body>' . $value . '</body></html>',
+            '<!doctype html><html><head><meta charset="UTF-8"></head><body>' . $value . '</body></html>',
             LIBXML_HTML_NODEFDTD | LIBXML_NOERROR | LIBXML_NOWARNING,
         );
         libxml_clear_errors();

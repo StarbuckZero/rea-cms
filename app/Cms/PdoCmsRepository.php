@@ -409,11 +409,13 @@ final class PdoCmsRepository implements MediaUsage
     }
 
     /** @return list<array<string, mixed>> */
-    public function images(): array
+    public function images(bool $publicOnly = false): array
     {
         return $this->rows('SELECT id, stored_name, original_name, mime_type, file_size, '
             . 'alt_text, caption, description '
-            . 'FROM `' . $this->media . "` WHERE mime_type LIKE 'image/%' ORDER BY created_at DESC, id DESC");
+            . 'FROM `' . $this->media . "` WHERE mime_type LIKE 'image/%' "
+            . ($publicOnly ? "AND visibility = 'public' " : '')
+            . 'ORDER BY created_at DESC, id DESC');
     }
 
     /** @return array<string, mixed>|null */

@@ -67,6 +67,18 @@ final class ApplicationFactory
             $environment,
             $projectRoot,
         );
+        $events = static function () use ($environment, $projectRoot): \ReaCms\Events\EventController {
+            // ZIP updates must also work with an older authoritative Composer class map.
+            foreach (
+                [
+                'EventDates', 'EventValidator', 'EventQuery', 'EventPresenter', 'EventCalendar',
+                'PdoEventRepository', 'EventController', 'EventControllerFactory',
+                ] as $class
+            ) {
+                require_once $projectRoot . '/app/Events/' . $class . '.php';
+            }
+            return \ReaCms\Events\EventControllerFactory::create($environment, $projectRoot);
+        };
         $cms = static function () use ($environment, $views, $projectRoot): CmsController {
             $pdo = ConnectionFactory::create($environment);
             $prefix = $environment->get('DB_TABLE_PREFIX', 'rea_') ?? 'rea_';
@@ -259,6 +271,46 @@ final class ApplicationFactory
                 $parameters['format'],
             ),
         );
+        $router->get('/api/v1/events.{format}', static fn (Request $request, array $p): Response =>
+            $events()->collection($request, $p['format']));
+        $router->get('/api/v1/events/{id}.{format}', static fn (Request $request, array $p): Response =>
+            $events()->item($request, (int) $p['id'], $p['format']));
+        $router->get('/api/v1/events/{id}/calendar', static fn (Request $request, array $p): Response =>
+            $events()->item($request, (int) $p['id'], 'ics'));
+        $router->get('/api/v1/event-types.json', static fn (Request $request): Response =>
+            $events()->apiTypes($request));
+        $router->get('/cms/events', static fn (Request $request): Response => $events()->index($request));
+        $router->get('/cms/events/new', static fn (Request $request): Response => $events()->form($request));
+        $router->get('/cms/events/{id}/edit', static fn (Request $request, array $p): Response =>
+            $events()->form($request, (int) $p['id']));
+        $router->get('/cms/events/{id}/preview', static fn (Request $request, array $p): Response =>
+            $events()->preview($request, (int) $p['id']));
+        foreach (['/cms/events', '/api/v1/events.json'] as $path) {
+            $router->post($path, static fn (Request $request): Response => $events()->mutate($request, 'save'));
+        }
+        $router->post('/cms/events/settings', static fn (Request $request): Response =>
+            $events()->mutate($request, 'settings'));
+        foreach (['/cms/events/types', '/api/v1/event-types.json'] as $path) {
+            $router->post($path, static fn (Request $request): Response => $events()->mutate($request, 'type-save'));
+        }
+        $router->post('/cms/events/types/{id}', static fn (Request $request, array $p): Response =>
+            $events()->mutate($request, 'type-save', (int) $p['id']));
+        $router->post('/cms/events/types/{id}/delete', static fn (Request $request, array $p): Response =>
+            $events()->mutate($request, 'type-delete', (int) $p['id']));
+        $router->post('/cms/events/{id}', static fn (Request $request, array $p): Response =>
+            $events()->mutate($request, 'save', (int) $p['id']));
+        foreach (['delete', 'duplicate', 'publish', 'unpublish'] as $action) {
+            foreach (['/cms/events/{id}/', '/api/v1/events/{id}/'] as $path) {
+                $router->post($path . $action, static fn (Request $request, array $p): Response =>
+                    $events()->mutate($request, $action, (int) $p['id']));
+            }
+        }
+        foreach (['PATCH' => 'save', 'DELETE' => 'delete'] as $method => $action) {
+            $router->add($method, '/api/v1/events/{id}.json', static fn (Request $request, array $p): Response =>
+                $events()->mutate($request, $action, (int) $p['id']));
+            $router->add($method, '/api/v1/event-types/{id}.json', static fn (Request $request, array $p): Response =>
+                $events()->mutate($request, $action === 'save' ? 'type-save' : 'type-delete', (int) $p['id']));
+        }
         $router->get('/login', static fn (Request $request): Response => $auth()->loginForm($request));
         $router->post('/login', static fn (Request $request): Response => $auth()->login($request));
         $router->post('/logout', static fn (Request $request): Response => $auth()->logout($request));
