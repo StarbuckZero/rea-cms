@@ -32,7 +32,9 @@
       "excerpt": {"type":"text","label":"Excerpt","description":"Short summary of the blog post."},
       "content": {"type":"html","label":"Content","description":"Sanitized rich-text blog post content."},
       "locale": {"type":"string","label":"Locale","description":"Content locale code."},
-      "publishedAt": {"type":"datetime","label":"Published date","description":"Publication timestamp in ISO 8601 format."}
+      "publishedAt": {"type":"datetime","label":"Published date","description":"Publication timestamp in ISO 8601 format."},
+      "publishedDate": {"type":"string","label":"Formatted published date","description":"Published date in the application timezone, such as September 8, 2026; empty when unavailable."},
+      "publishedTime": {"type":"string","label":"Formatted published time","description":"Published time in the application timezone, such as 8:30 PM; empty when unavailable."}
     }
   }
 }

@@ -15,7 +15,11 @@ final class BlogTransfer
             'schemaVersion' => 1,
             'plugin' => ['id' => 'blog', 'version' => $pluginVersion],
             'exportedAt' => gmdate(DATE_ATOM),
-            'posts' => array_map(static fn (BlogPost $post): array => $post->api(), $posts),
+            'posts' => array_map(static function (BlogPost $post): array {
+                $data = $post->api();
+                unset($data['publishedDate'], $data['publishedTime']);
+                return $data;
+            }, $posts),
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     }
 

@@ -39,6 +39,7 @@ final class TextBlockControllerFactory
             )),
             AuthServicesFactory::create($environment),
             new ViewRenderer($projectRoot . '/resources/views'),
+            $environment->get('APP_TIMEZONE'),
         );
     }
 }

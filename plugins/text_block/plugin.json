@@ -24,7 +24,11 @@
       "name": {"type":"string","label":"Name","description":"Unique URL-safe API name for the text block."},
       "content": {"type":"html","label":"Content","description":"Sanitized reusable text or rich-text content."},
       "createdAt": {"type":"datetime","label":"Created date","description":"Creation timestamp in ISO 8601 format."},
-      "updatedAt": {"type":"datetime","label":"Updated date","description":"Last-update timestamp in ISO 8601 format."}
+      "createdDate": {"type":"string","label":"Formatted created date","description":"Created date in the application timezone, such as September 8, 2026."},
+      "createdTime": {"type":"string","label":"Formatted created time","description":"Created time in the application timezone, such as 8:30 PM."},
+      "updatedAt": {"type":"datetime","label":"Updated date","description":"Last-update timestamp in ISO 8601 format."},
+      "updatedDate": {"type":"string","label":"Formatted updated date","description":"Updated date in the application timezone, such as September 8, 2026."},
+      "updatedTime": {"type":"string","label":"Formatted updated time","description":"Updated time in the application timezone, such as 8:30 PM."}
     }
   }
 }

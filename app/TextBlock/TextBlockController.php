@@ -30,6 +30,7 @@ final class TextBlockController
         private readonly PluginApiRenderer $api,
         private readonly AuthServices $auth,
         private readonly ViewRenderer $views,
+        private readonly ?string $timezone = null,
     ) {
     }
 
@@ -39,7 +40,7 @@ final class TextBlockController
         $blocks = $this->repository->all();
 
         return $this->serialize($request, $format, 'list', [
-            'data' => array_map(static fn (TextBlock $block): array => $block->api(), $blocks),
+            'data' => array_map(fn (TextBlock $block): array => $block->api($this->timezone), $blocks),
             'meta' => ['total' => count($blocks)],
             'links' => ['self' => '/api/v1/text-block.' . rawurlencode($format)],
         ]);
@@ -53,7 +54,7 @@ final class TextBlockController
             throw new RouteNotFound();
         }
 
-        return $this->serialize($request, $format, 'detail', ['data' => $block->api()]);
+        return $this->serialize($request, $format, 'detail', ['data' => $block->api($this->timezone)]);
     }
 
     public function named(Request $request, string $name, string $format): Response
@@ -67,7 +68,7 @@ final class TextBlockController
             throw new RouteNotFound();
         }
 
-        return $this->serialize($request, $format, 'detail', ['data' => $block->api()]);
+        return $this->serialize($request, $format, 'detail', ['data' => $block->api($this->timezone)]);
     }
 
     public function index(Request $request): Response

@@ -37,6 +37,22 @@ final class BlogControllerTest extends TestCase
         }
     }
 
+    public function testTemplatesRenderPublicationDateAndTimeInApplicationTimezone(): void
+    {
+        $controller = $this->controller(true);
+        foreach (['html', 'txt'] as $format) {
+            foreach (
+                [$controller->collection($this->request(), $format),
+                $controller->item($this->request(), 1, $format)] as $response
+            ) {
+                self::assertStringContainsString('August 29, 2026 6:00 AM', $response->body());
+                self::assertStringNotContainsString('{blog.', $response->body());
+            }
+        }
+        $data = json_decode($controller->item($this->request(), 1, 'json')->body(), true)['data'];
+        self::assertSame('2026-08-29T10:00:00+00:00', $data['publishedAt']);
+    }
+
     private function controller(bool $enabled): BlogController
     {
         $repository = new class implements BlogRepository {
@@ -78,12 +94,21 @@ final class BlogControllerTest extends TestCase
             $enabled ? 'enabled' : 'disabled',
             str_repeat('a', 64),
         );
+        $templates = new InMemoryPluginApiTemplateRepository();
+        foreach (['html', 'txt'] as $format) {
+            foreach (['list', 'detail'] as $mode) {
+                $templates->templates['blog'][$format . '_' . $mode] = file_get_contents(
+                    dirname(__DIR__, 3) . '/plugins/blog/templates/api/' . $mode . '.' . $format,
+                );
+            }
+        }
         return new BlogController(
             $repository,
             new PluginRouteGate($registry),
             new OriginAllowlist(['http://rea-cms.test']),
             new FrozenClock(new DateTimeImmutable('2026-08-29T12:00:00+00:00')),
-            new PluginApiRenderer(new InMemoryPluginApiTemplateRepository()),
+            new PluginApiRenderer($templates),
+            'America/New_York',
         );
     }
 

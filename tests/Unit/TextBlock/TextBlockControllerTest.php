@@ -49,7 +49,11 @@ final class TextBlockControllerTest extends TestCase
             'name' => 'welcome-message',
             'content' => '<p>Welcome to our website!</p><br><p>Come in.</p>',
             'createdAt' => '2026-09-02T12:00:00+00:00',
+            'createdDate' => 'September 2, 2026',
+            'createdTime' => '8:00 AM',
             'updatedAt' => '2026-09-02T12:30:00+00:00',
+            'updatedDate' => 'September 2, 2026',
+            'updatedTime' => '8:30 AM',
         ], json_decode($json->body(), true, 32, JSON_THROW_ON_ERROR)['data']);
         self::assertStringContainsString('<p>Welcome to our website!</p>', $html->body());
         self::assertSame('text/plain; charset=US-ASCII', $text->header('Content-Type'));
@@ -66,6 +70,22 @@ final class TextBlockControllerTest extends TestCase
 
         $this->expectException(RouteNotFound::class);
         $this->controller(false)->collection($this->request(), 'json');
+    }
+
+    public function testAllTemplateEndpointsRenderReadableDatesAndTimes(): void
+    {
+        $controller = $this->controller(true);
+        foreach (['html', 'txt'] as $format) {
+            foreach (
+                [$controller->collection($this->request(), $format),
+                $controller->item($this->request(), 123, $format),
+                $controller->named($this->request(), 'welcome-message', $format)] as $response
+            ) {
+                self::assertStringContainsString('September 2, 2026 8:00 AM', $response->body());
+                self::assertStringContainsString('September 2, 2026 8:30 AM', $response->body());
+                self::assertStringNotContainsString('{textBlock.', $response->body());
+            }
+        }
     }
 
     public function testInvalidNameRouteIsNotExposed(): void
@@ -125,6 +145,12 @@ final class TextBlockControllerTest extends TestCase
             'txt_detail' => '{textBlock.content}',
         ];
 
+        foreach ($templates->templates['text_block'] as &$template) {
+            $template .= "\n" . '{textBlock.createdDate} {textBlock.createdTime}'
+                . "\n" . '{textBlock.updatedDate} {textBlock.updatedTime}';
+        }
+        unset($template);
+
         return new TextBlockController(
             $repository,
             new PluginRouteGate($registry),
@@ -132,6 +158,7 @@ final class TextBlockControllerTest extends TestCase
             new PluginApiRenderer($templates),
             $this->auth($registry),
             new ViewRenderer(dirname(__DIR__, 3) . '/resources/views'),
+            'America/New_York',
         );
     }
 

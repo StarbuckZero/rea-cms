@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ReaCms\Blog;
 
 use DateTimeImmutable;
+use ReaCms\Support\TemplateDateTime;
 
 final class BlogPost
 {
@@ -22,8 +23,10 @@ final class BlogPost
     }
 
     /** @return array<string, mixed> */
-    public function api(): array
+    public function api(?string $timezone = null): array
     {
+        $published = TemplateDateTime::local($this->publishAt, $timezone);
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -32,6 +35,8 @@ final class BlogPost
             'content' => $this->content,
             'locale' => $this->locale,
             'publishedAt' => $this->publishAt?->format(DATE_ATOM),
+            'publishedDate' => $published?->format('F j, Y') ?? '',
+            'publishedTime' => $published?->format('g:i A') ?? '',
         ];
     }
 }

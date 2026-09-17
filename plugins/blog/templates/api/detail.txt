@@ -1,3 +1,4 @@
 Title: {blog.title}
+{blog.publishedDate} {blog.publishedTime}
 
 {blog.content}

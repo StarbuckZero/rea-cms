@@ -21,6 +21,7 @@ final class BlogController
         private readonly OriginAllowlist $origins,
         private readonly Clock $clock,
         private readonly PluginApiRenderer $api,
+        private readonly ?string $timezone = null,
     ) {
     }
 
@@ -38,7 +39,7 @@ final class BlogController
             ($query->page - 1) * $query->perPage,
         );
         $response = $this->api->render('blog', 'blog', $format, 'list', [
-            'data' => array_map(static fn (BlogPost $post): array => $post->api(), $posts),
+            'data' => array_map(fn (BlogPost $post): array => $post->api($this->timezone), $posts),
             'meta' => ['page' => $query->page, 'perPage' => $query->perPage, 'total' => $total,
                 'totalPages' => (int) ceil($total / $query->perPage)],
             'links' => ['self' => sprintf('/api/v1/blog.%s?page=%d', $format, $query->page)],
@@ -56,7 +57,7 @@ final class BlogController
         if ($post === null) {
             throw new RouteNotFound();
         }
-        $response = $this->api->render('blog', 'blog', $format, 'detail', ['data' => $post->api()]);
+        $response = $this->api->render('blog', 'blog', $format, 'detail', ['data' => $post->api($this->timezone)]);
         return $response === null
             ? Response::json(['error' => ['code' => 'not_acceptable', 'message' => 'Unsupported format.']], 406)
             : $this->cors($request, $response);

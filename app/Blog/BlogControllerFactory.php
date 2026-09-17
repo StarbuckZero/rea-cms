@@ -27,6 +27,7 @@ final class BlogControllerFactory
             $origins,
             new SystemClock(),
             new PluginApiRenderer(new PdoPluginApiTemplateRepository($pdo, $projectRoot . '/plugins', $prefix)),
+            $environment->get('APP_TIMEZONE'),
         );
     }
 }
