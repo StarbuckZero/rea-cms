@@ -172,3 +172,5 @@ changes. Run `php bin/migrate.php`, configure **Administration → Webhooks**, a
 schedule `php bin/deliver-webhooks.php --limit=100` to process deliveries. See
 [webhook setup and the receiver contract](docs/webhooks.md) for event names,
 signature verification, retry behavior, and frontend cache invalidation.
+
+For browser-based release ZIP updates on HostGator, see [HostGator ZIP updates](docs/hostgator-zip-updates.md).

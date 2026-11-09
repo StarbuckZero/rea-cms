@@ -27,6 +27,7 @@ final class UpgradeController
         private readonly CoreMigrationRunner $migrations,
         private readonly string $version,
         private readonly string $lockPath,
+        private readonly ?ReleaseZipInstaller $releases = null,
     ) {
     }
 
@@ -63,7 +64,9 @@ final class UpgradeController
             $session,
             $user,
             $plan,
-            $upgraded ? 'The database upgrade completed successfully.' : null,
+            $upgraded ? 'The database upgrade completed successfully.' :
+                (($request->query()['uploaded'] ?? null) === '1'
+                    ? 'Release files installed. Apply any pending database migrations below.' : null),
         );
     }
 
@@ -137,6 +140,27 @@ final class UpgradeController
         chmod($this->lockPath, 0600);
 
         try {
+            if (($form['action'] ?? '') === 'upload') {
+                $upload = $request->file('release');
+                if ($this->releases === null || $upload === null || !$upload->isValid()) {
+                    throw new RuntimeException('Select a release ZIP within the server upload limit.');
+                }
+                if ($upload->size > 64 * 1024 * 1024) {
+                    throw new RuntimeException('The release ZIP exceeds 64 MB.');
+                }
+                $response = $this->services->sessions->withCookie(
+                    Response::redirect('/admin/upgrade?uploaded=1'),
+                    $session,
+                );
+                $this->services->audit->record(
+                    'system.release_upload_started',
+                    $user->id,
+                    $request->clientIp(),
+                    $request->requestId(),
+                );
+                $this->releases->install($upload->temporaryPath, trim($form['checksum'] ?? ''));
+                return $response;
+            }
             $migrated = $this->migrations->migrate();
             $this->services->sessions->markReauthenticated($session);
             $this->services->audit->record(
@@ -150,7 +174,16 @@ final class UpgradeController
                     'migrations' => implode(',', $migrated),
                 ],
             );
-        } catch (Throwable) {
+        } catch (Throwable $error) {
+            if (($form['action'] ?? '') === 'upload') {
+                error_log('Release upload failed: ' . $error->getMessage());
+                return Response::html(
+                    '<h1>Release upload stopped</h1><p>'
+                    . htmlspecialchars($error->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                    . '</p><p><a href="/admin/upgrade">Return to System Upgrade</a></p>',
+                    422,
+                )->withHeader('Cache-Control', 'no-store, private');
+            }
             return $this->renderWithPlan(
                 $request,
                 $session,
@@ -243,6 +276,7 @@ final class UpgradeController
             'success' => $success,
             'error' => $error,
             'canRun' => $canRun,
+            'canUpload' => $this->releases !== null,
         ]);
 
         return $this->services->sessions->withCookie($this->page(

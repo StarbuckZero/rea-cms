@@ -10,6 +10,12 @@ use ReaCms\Core\Http\SecurityHeaders;
 use ReaCms\Setup\SetupApplicationFactory;
 
 $projectRoot = dirname(__DIR__);
+if (is_file($projectRoot . '/storage/upgrade-maintenance')) {
+    http_response_code(503);
+    header('Retry-After: 120');
+    header('Cache-Control: no-store');
+    exit('Rea CMS is being updated. Please try again shortly.');
+}
 require $projectRoot . '/vendor/autoload.php';
 $request = Request::fromGlobals();
 

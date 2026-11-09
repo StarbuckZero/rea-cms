@@ -138,6 +138,31 @@ final class UpgradeControllerTest extends TestCase
         self::assertSame('system.upgrade_completed', $this->audit->events[0]['event']);
     }
 
+    public function testZipUploadUsesTheSameAuthorizationAndConfirmationChecks(): void
+    {
+        $request = $this->authenticatedRequest('POST', '/admin/upgrade');
+        self::assertSame(403, $this->controller->apply($request)->status());
+        $this->roles->roles[1] = ['super-administrator'];
+        $token = $request->cookie(SessionManager::COOKIE) ?? '';
+        $valid = [
+            'action' => 'upload',
+            '_csrf' => $this->csrf->token($token),
+            'backup_confirmed' => '1',
+            'password' => 'correct horse battery staple',
+        ];
+        foreach ([['_csrf' => 'invalid'], ['backup_confirmed' => ''], ['password' => 'wrong']] as $invalid) {
+            $response = $this->controller->apply(new Request(
+                'POST',
+                '/admin/upgrade',
+                ['cookie' => SessionManager::COOKIE . '=' . $token],
+                [],
+                http_build_query(array_replace($valid, $invalid)),
+            ));
+            self::assertContains($response->status(), [419, 422]);
+            self::assertSame([], $this->database->records);
+        }
+    }
+
     private function authenticatedRequest(string $method, string $path): Request
     {
         $this->users->users[1] = new User(

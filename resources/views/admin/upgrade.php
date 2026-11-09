@@ -11,13 +11,14 @@ use ReaCms\Database\Migrations\CoreMigrationPlan;
 /** @var string|null $success */
 /** @var string|null $error */
 /** @var bool $canRun */
+/** @var bool $canUpload */
 ?>
 <section aria-labelledby="upgrade-heading">
     <p class="eyebrow">System maintenance</p>
     <div class="plugin-management-heading mt-3">
         <div>
             <h1 id="upgrade-heading" class="text-3xl font-bold">Upgrade Rea CMS</h1>
-            <p class="mt-3 text-secondary">Apply database migrations after uploading and activating a verified release.</p>
+            <p class="mt-3 text-secondary">Upload a release ZIP, then apply any pending database migrations.</p>
         </div>
         <a class="button-secondary" href="/admin">Back to administration</a>
     </div>
@@ -27,6 +28,42 @@ use ReaCms\Database\Migrations\CoreMigrationPlan;
     <?php endif; ?>
     <?php if ($error !== null) : ?>
         <p class="notice-danger mt-6" role="alert"><?= $escape($error) ?></p>
+    <?php endif; ?>
+
+    <?php if ($canUpload) : ?>
+        <section class="panel mt-6" aria-labelledby="upload-heading">
+            <h2 id="upload-heading" class="text-xl font-semibold">Upload CMS update</h2>
+            <p class="mt-3 text-secondary">
+                Upload a trusted Rea CMS release ZIP with production dependencies (not a GitHub source ZIP).
+                Your settings, uploads and stored content are preserved. Bundled code and templates are replaced.
+                Pause cPanel cron jobs during the update and keep a verified application and database backup.
+            </p>
+            <form class="mt-6 space-y-5" method="post" action="/admin/upgrade" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="<?= $escape($csrfToken) ?>">
+                <input type="hidden" name="action" value="upload">
+                <div>
+                    <label class="form-label" for="release-zip">Release ZIP (maximum 64 MB)</label>
+                    <input class="form-input" id="release-zip" name="release" type="file" accept=".zip" required>
+                    <p class="mt-2 text-secondary">Server limits: upload <?= $escape(ini_get('upload_max_filesize')) ?>,
+                        request <?= $escape(ini_get('post_max_size')) ?>. Adjust these in cPanel if needed.</p>
+                </div>
+                <div>
+                    <label class="form-label" for="release-checksum">SHA-256 from the release .sha256 file</label>
+                    <input class="form-input" id="release-checksum" name="checksum" pattern="[a-fA-F0-9]{64}"
+                           maxlength="64" required>
+                </div>
+                <label class="flex items-start gap-3">
+                    <input class="mt-1" name="backup_confirmed" type="checkbox" value="1" required>
+                    <span>I created and verified a current database and application backup.</span>
+                </label>
+                <div>
+                    <label class="form-label" for="upload-password">Confirm your current password</label>
+                    <input class="form-input" id="upload-password" name="password" type="password"
+                           autocomplete="current-password" required>
+                </div>
+                <button class="button-primary" type="submit">Install release ZIP</button>
+            </form>
+        </section>
     <?php endif; ?>
 
     <div class="mt-8 grid gap-6 md:grid-cols-2">

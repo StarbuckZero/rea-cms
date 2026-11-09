@@ -154,6 +154,7 @@ final class ApplicationFactory
                 ),
                 ApplicationVersion::detect($projectRoot),
                 $projectRoot . '/storage/upgrade.lock',
+                new \ReaCms\Operations\ReleaseZipInstaller($projectRoot),
             );
         };
 
